@@ -10,10 +10,12 @@ local animItems = mq.FindTextureAnimation('A_DragItem')
 local open = true
 local shouldDrawUI = true
 local terminate = false
-local selected = 0
+-- Some sections (just buffs atm) have more than 1 list property. Using a single 'selected'
+-- value for the selected list item would interfere when multiple lists are displayed.
+-- So, set individual selected items for up to 5 list properties in a section.
+local selected = {0,0,0,0,0}
 
 local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
-
 local INIFile = nil
 local INIFileContents = nil
 local config = nil
@@ -24,10 +26,9 @@ local myClass = mq.TLO.Me.Class.ShortName():lower()
 
 -- Storage for spell/AA/disc picker
 local spellIter, aaIter, discIter = 1,1,1
-local spells, altAbilities, discs = {},{},{}
+local spells, altAbilities, discs = {categories={}},{},{}
 
 -- Helper functions
-
 local Split = function(input, sep)
     if sep == nil then
         sep = "|"
@@ -74,21 +75,82 @@ local FindINIFileName = function()
     return nil
 end
 
--- ImGui functions
+-- Ability menu initializers
+local InitSpellTree = function()
+    -- Sort spells by level
+    local SpellSorter = function(a, b)
+        if mq.TLO.Spell(a).Level() < mq.TLO.Spell(b).Level() then
+            return false
+        elseif mq.TLO.Spell(b).Level() < mq.TLO.Spell(a).Level() then
+            return true
+        else
+            return false
+        end
+    end
+    -- Build spell tree for picking spells
+    repeat
+        local spell = mq.TLO.Me.Book(spellIter)
+        if not spells[spell.Category()] then
+            spells[spell.Category()] = {subcategories={}}
+            table.insert(spells.categories, spell.Category())
+        end
+        if not spells[spell.Category()][spell.Subcategory()] then
+            spells[spell.Category()][spell.Subcategory()] = {}
+            table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
+        end
+        if spell.Level() >= myLevel-30 then
+            table.insert(spells[spell.Category()][spell.Subcategory()], spell.Name())
+        end
+        spellIter = spellIter + 1
+    until mq.TLO.Me.Book(spellIter)() == nil
+    table.sort(spells.categories)
+    for category,subcategories in pairs(spells) do
+        if category ~= 'categories' then
+            table.sort(spells[category].subcategories)
+            for subcategory,subcatspells in pairs(subcategories) do
+                if subcategory ~= 'subcategories' then
+                    table.sort(subcatspells, SpellSorter)
+                end
+            end
+        end
+    end
+end
 
+local InitAATree = function()
+    -- TODO: what's the right way to loop through activated abilities?
+    for aaIter=1,10000 do
+        if mq.TLO.Me.AltAbility(aaIter)() and mq.TLO.Me.AltAbility(aaIter).Spell() then
+            table.insert(altAbilities, mq.TLO.Me.AltAbility(aaIter).Name())
+        end
+        aaIter = aaIter + 1
+    end
+    table.sort(altAbilities)
+end
+
+local InitDiscTree = function()
+    -- Build disc tree for picking discs
+    repeat
+        table.insert(discs, mq.TLO.Me.CombatAbility(discIter).Name())
+        discIter = discIter + 1
+    until mq.TLO.Me.CombatAbility(discIter)() == nil
+    table.sort(discs)
+end
+
+-- ImGui functions
 local DrawSpellPicker = function(sectionName, key, index)
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
         if ImGui.BeginMenu('Spells##rcmenu'..sectionName..key) then
-            for category,subcategories in pairs(spells) do
+            for _,category in ipairs(spells.categories) do
                 -- Spell Subcategories submenu
                 if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
-                    for subcategory,catspells in pairs(subcategories) do
+                    for _,subcategory in ipairs(spells[category].subcategories) do
                         -- Subcategory Spell menu
                         if ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
-                            for i,spell in ipairs(catspells) do
-                                if ImGui.MenuItem(spell..'##'..sectionName..key..subcategory) then
+                            for _,spell in ipairs(spells[category][subcategory]) do
+                                local spellLevel = mq.TLO.Spell(spell).Level()
+                                if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
                                     config[sectionName][key..index] = spell
                                 end
                             end
@@ -109,35 +171,43 @@ local DrawSpellPicker = function(sectionName, key, index)
             end
             ImGui.EndMenu()
         end
-        -- TODO: also add discs
+        -- Top level 'Discs' menu item
+        if ImGui.BeginMenu('Combat Abilities##rcmenu'..sectionName..key) then
+            for _,disc in ipairs(discs) do
+                if ImGui.MenuItem(disc..'##disc'..sectionName..key) then
+                    config[sectionName][key..index] = disc
+                end
+            end
+            ImGui.EndMenu()
+        end
         ImGui.EndPopup()
     end
 end
 
 -- Draw the value and condition of the selected list item
-local DrawSelectedItem = function(sectionName, key, value)
+local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     ImGui.Separator()
-    ImGui.Text(string.format('%s.%s%d', sectionName, key, selected))
+    ImGui.Text(string.format('%s.%s%d', sectionName, key, selected[selectedIdx]))
     ImGui.Text('Value: ')
     ImGui.SameLine()
-    if config[sectionName][key..selected] == nil then
-        config[sectionName][key..selected] = 'NULL'
+    if config[sectionName][key..selected[selectedIdx]] == nil then
+        config[sectionName][key..selected[selectedIdx]] = 'NULL'
     end
     ImGui.SetCursorPosX(175)
-    config[sectionName][key..selected] = ImGui.InputText('##'..sectionName..key..selected, config[sectionName][key..selected])
-    if value['Conditions'] and config[sectionName][sectionName..'COn'] then
+    config[sectionName][key..selected[selectedIdx]] = ImGui.InputText('##'..sectionName..key..selected[selectedIdx], config[sectionName][key..selected[selectedIdx]])
+    if value['Conditions'] then
         ImGui.Text('Condition: ')
         ImGui.SameLine()
-        if config[sectionName][key..'Cond'..selected] == nil then
-            config[sectionName][key..'Cond'..selected] = 'NULL'
+        if config[sectionName][key..'Cond'..selected[selectedIdx]] == nil then
+            config[sectionName][key..'Cond'..selected[selectedIdx]] = 'NULL'
         end
         ImGui.SetCursorPosX(175)
-        config[sectionName][key..'Cond'..selected] = ImGui.InputText('##condition'..sectionName..key..selected, config[sectionName][key..'Cond'..selected])
+        config[sectionName][key..'Cond'..selected[selectedIdx]] = ImGui.InputText('##condition'..sectionName..key..selected[selectedIdx], config[sectionName][key..'Cond'..selected[selectedIdx]])
     end
     ImGui.Separator()
 end
 
-local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
+local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
     local iniValue = config[sectionName][key..index]
     if iniValue and iniValue ~= 'NULL' then
         local iniValueParts = Split(iniValue,'|')
@@ -153,7 +223,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
         else
             -- INI value is set to non-spell/item
             if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-                if setSelected then selected = index end
+                if selectedIdx >= 0 then selected[selectedIdx] = index end
             end
         end
         if ImGui.IsItemHovered() then
@@ -164,20 +234,20 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
             ImGui.EndTooltip()
         end
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            if setSelected then selected = index end
+            if selectedIdx >= 0 then selected[selectedIdx] = index end
         end
         -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index)
     else
         if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-            if setSelected then selected = index end
+            if selectedIdx >= 0 then selected[selectedIdx] = index end
         end
         DrawSpellPicker(sectionName, key, index)
     end
 end
 
 -- Draw 0..N buttons based on value of XYZSize input
-local DrawList = function(sectionName, key, value)
+local DrawList = function(sectionName, key, value, selectedIdx)
     ImGui.Text(key..'Size: ')
     ImGui.SameLine()
     ImGui.PushItemWidth(100)
@@ -191,18 +261,18 @@ local DrawList = function(sectionName, key, value)
     elseif config[sectionName][key..'Size'] > value['Max'] then
         config[sectionName][key..'Size'] = value['Max']
     end
-    if config[sectionName][key..'Size'] < selected then
-        selected = 0
+    if config[sectionName][key..'Size'] < selected[selectedIdx] then
+        selected[selectedIdx] = 0
     end
     ImGui.PopItemWidth()
     for i=1,config[sectionName][key..'Size'] do
-        DrawSpellIconOrButton(sectionName, key, i, true)
+        DrawSpellIconOrButton(sectionName, key, i, selectedIdx)
         if i%20 ~= 0 and i < config[sectionName][key..'Size'] then
             ImGui.SameLine()
         end
     end
-    if selected > 0 then
-        DrawSelectedItem(sectionName, key, value)
+    if selected[selectedIdx] > 0 then
+        DrawSelectedListItem(sectionName, key, value, selectedIdx)
     end
 end
 
@@ -227,18 +297,24 @@ local DrawProperty = function(sectionName, key, value)
     if value['Type'] == 'SWITCH' then
         config[sectionName][key] = ImGui.Checkbox('##'..key, InitCheckBoxValue(config[sectionName][key]))
     elseif value['Type'] == 'SPELL' then
-        DrawSpellIconOrButton(sectionName, key, '', false)
+        DrawSpellIconOrButton(sectionName, key, '', -1)
         ImGui.SameLine()
-        ImGui.PushItemWidth(200)
+        ImGui.PushItemWidth(350)
         config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, config[sectionName][key])
         ImGui.PopItemWidth()
-    else
-        ImGui.PushItemWidth(200)
-        if type(config[sectionName][key]) == 'string' then
-            config[sectionName][key] = ImGui.InputText('##'..sectionName..key, config[sectionName][key])
-        elseif type(config[sectionName][key]) == 'number' then
-            config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, config[sectionName][key])
+    elseif value['Type'] == 'NUMBER' then
+        if config[sectionName][key] == 'NULL' then config[sectionName][key] = 0 end
+        ImGui.PushItemWidth(350)
+        config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, config[sectionName][key])
+        ImGui.PopItemWidth()
+        if value['Min'] and config[sectionName][key] < value['Min'] then
+            config[sectionName][key] = value['Min']
+        elseif value['Max'] and config[sectionName][key] > value['Max'] then
+            config[sectionName][key] = value['Max']
         end
+    elseif value['Type'] == 'STRING' then
+        ImGui.PushItemWidth(350)
+        config[sectionName][key] = ImGui.InputText('##'..sectionName..key, tostring(config[sectionName][key]))
         ImGui.PopItemWidth()
     end
 end
@@ -246,10 +322,23 @@ end
 -- Draw main On/Off switches for an INI section
 local DrawSectionControlSwitches = function(sectionName, sectionProperties)
     if sectionProperties['On'] then
-        config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', InitCheckBoxValue(config[sectionName][sectionName..'On']))
+        if sectionProperties['On']['Type'] == 'SWITCH' then
+            config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', InitCheckBoxValue(config[sectionName][sectionName..'On']))
+        elseif sectionProperties['On']['Type'] == 'NUMBER' then
+            -- Type=NUMBER control switch mostly a special case for DPS section only
+            if not config[sectionName][sectionName..'On'] then config[sectionName][sectionName..'On'] = 0 end
+            ImGui.PushItemWidth(100)
+            config[sectionName][sectionName..'On'] = ImGui.InputInt(sectionName..'On', config[sectionName][sectionName..'On'])
+            ImGui.PopItemWidth()
+            if sectionProperties['On']['Min'] and config[sectionName][sectionName..'On'] < sectionProperties['On']['Min'] then
+                config[sectionName][sectionName..'On'] = sectionProperties['On']['Min']
+            elseif sectionProperties['On']['Max'] and config[sectionName][sectionName..'On'] > sectionProperties['On']['Max'] then
+                config[sectionName][sectionName..'On'] = sectionProperties['On']['Max']
+            end
+        end
+        if sectionProperties['COn'] then ImGui.SameLine() end
     end
     if sectionProperties['COn'] then
-        ImGui.SameLine()
         config[sectionName][sectionName..'COn'] = ImGui.Checkbox(sectionName..'COn', InitCheckBoxValue(config[sectionName][sectionName..'COn']))
     end
     ImGui.Separator()
@@ -264,17 +353,22 @@ local DrawSection = function(sectionName, sectionProperties)
     if sectionProperties['Controls'] then
         DrawSectionControlSwitches(sectionName, sectionProperties['Controls'])
     end
-    -- Draw List properties before general properties
-    for key,value in pairs(sectionProperties['Properties']) do
-        if value['Type'] == 'LIST' then
-            DrawList(sectionName, key, value)
+    if ImGui.BeginChild('sectionwindow') then
+        -- Draw List properties before general properties
+        local listIdx = 1
+        for key,value in pairs(sectionProperties['Properties']) do
+            if value['Type'] == 'LIST' then
+                DrawList(sectionName, key, value, listIdx)
+                listIdx = listIdx + 1
+            end
         end
-    end
-    -- Generic properties last
-    for key,value in pairs(sectionProperties['Properties']) do
-        if value['Type'] ~= 'LIST' then
-            DrawProperty(sectionName, key, value)
+        -- Generic properties last
+        for key,value in pairs(sectionProperties['Properties']) do
+            if value['Type'] ~= 'LIST' then
+                DrawProperty(sectionName, key, value)
+            end
         end
+        ImGui.EndChild()
     end
 end
 
@@ -297,19 +391,26 @@ local function Save()
 end
 
 local DrawRawINIEditTab = function()
-    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-        INIFileContents = ReadRawINIFile()
+    if ImGui.BeginChild('rawiniwindow') then
+        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+            if FileExists(INIFile) then
+                INIFileContents = ReadRawINIFile()
+            end
+        end
+        if ImGui.Button('Refresh Raw INI##rawini') then
+            if FileExists(INIFile) then
+                INIFileContents = ReadRawINIFile()
+            end
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Save Raw INI##rawini') then
+            WriteRawINIFile(INIFileContents)
+            config = LIP.load(mq.configDir..'\\'..INIFile)
+        end
+        local x,y = ImGui.GetContentRegionAvail()
+        INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
+        ImGui.EndChild()
     end
-    if ImGui.Button('Refresh Raw INI##rawini') then
-        INIFileContents = ReadRawINIFile()
-    end
-    ImGui.SameLine()
-    if ImGui.Button('Save Raw INI##rawini') then
-        WriteRawINIFile(INIFileContents)
-        config = LIP.load(mq.configDir..'\\'..INIFile)
-    end
-    local x,y = ImGui.GetContentRegionAvail()
-    INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents, x-15, y-15, ImGuiInputTextFlags.None)
     ImGui.EndTabItem()
 end
 
@@ -343,7 +444,7 @@ local DrawWindowTabBar = function()
             if not schema[sectionName].Classes or schema[sectionName].Classes[myClass] then
                 if ImGui.BeginTabItem(sectionName) then
                     if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                        selected = 0
+                        selected = {0,0,0,0,0}
                     end
                     DrawSection(sectionName, sectionProperties)
                     ImGui.EndTabItem()
@@ -379,46 +480,19 @@ else
     config = {}
 end
 
--- Sort spells by level
-local SpellSorter = function(a, b)
-    if mq.TLO.Spell(a).Level() < mq.TLO.Spell(b).Level() then
-        return false
-    elseif mq.TLO.Spell(b).Level() < mq.TLO.Spell(a).Level() then
-        return true
-    else
-        return false
-    end
-end
--- Build spell tree for picking spells
-repeat
-    local spell = mq.TLO.Me.Book(spellIter)
-    if not spells[spell.Category()] then
-        spells[spell.Category()] = {}
-    end
-    if not spells[spell.Category()][spell.Subcategory()] then
-        spells[spell.Category()][spell.Subcategory()] = {}
-    end
-    if spell.Level() >= myLevel-30 then
-        table.insert(spells[spell.Category()][spell.Subcategory()], spell.Name())
-    end
-    spellIter = spellIter + 1
-until mq.TLO.Me.Book(spellIter)() == nil
-for i,j in pairs(spells) do
-    for k,l in pairs(j) do
-        table.sort(spells[i][k], SpellSorter)
-    end
-end
--- TODO: what's the right way to loop through activated abilities?
-for aaIter=1,10000 do
-    if mq.TLO.Me.AltAbility(aaIter)() and mq.TLO.Me.AltAbility(aaIter).Spell() then
-        table.insert(altAbilities, mq.TLO.Me.AltAbility(aaIter).Name())
-    end
-    aaIter = aaIter + 1
-end
--- TODO: do the same thing for disciplines
+local initCo = coroutine.create(function()
+    -- Initializing and sorting spell tree takes a few seconds, so run in parallel
+    InitSpellTree()
+    InitAATree()
+    InitDiscTree()
+end)
+coroutine.resume(initCo)
 
 mq.imgui.init('MuleAssist', MAUI)
 
 while not terminate do
-    mq.delay(100)
+    if coroutine.status(initCo) == 'suspended' then
+        coroutine.resume(initCo)
+    end
+    mq.delay(20)
 end
