@@ -366,7 +366,7 @@ local schema = {
     Pull={
         Properties={
             PullWith={
-                Type='String'
+                Type='STRING'
             },
             MaxRadius={
                 Type='NUMBER',
