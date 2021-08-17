@@ -39,7 +39,19 @@ local schema = {
                 Type='SWITCH'
             },
             RezAcceptOn={--switch + extra option 0/1|96
-                Type='STRING'
+                Type='MULTIPART',
+                Parts={
+                    [1]={
+                        Name='On|Off',
+                        Type='SWITCH'
+                    },
+                    [2]={
+                        Name='Min. Pct',
+                        Type='NUMBER',
+                        Min=0,
+                        Max=100
+                    }
+                }
             },
             AcceptInvitesOn={
                 Type='SWITCH'
@@ -260,7 +272,7 @@ local schema = {
             },
             InterruptHeals={
                 Type='NUMBER',
-		Min=0
+                Min=0
             }
         }
     },
