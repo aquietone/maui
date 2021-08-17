@@ -259,7 +259,8 @@ local schema = {
                 Type='SWITCH'
             },
             InterruptHeals={
-                Type='SWITCH'
+                Type='NUMBER',
+		Min=0
             }
         }
     },
