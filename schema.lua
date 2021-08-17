@@ -411,7 +411,19 @@ local schema = {
                 Type='STRING'
             },
             PullLevel={
-                Type='STRING'
+                Type='MULTIPART',
+                Parts={
+                    [1]={
+                        Name='Min Level',
+                        Type='NUMBER',
+                        Min=1
+                    },
+                    [2]={
+                        Name='Max Level',
+                        Type='NUMBER',
+                        Min=1
+                    }
+                }
             },
             PullMeleeStick={
                 Type='SWITCH'
