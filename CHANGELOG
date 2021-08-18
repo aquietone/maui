@@ -1,2 +1,6 @@
+0.2
+- Spell upgrade buttons
+- Some different handling for values with multiple parts
+- Break up spell name and options after the | into separate inputs
 0.1
 - Initial recreate of original MuleAssist UI
