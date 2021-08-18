@@ -582,12 +582,12 @@ end
 local DrawRawINIEditTab = function()
     if ImGui.BeginChild('rawiniwindow') then
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            if FileExists(INIFile) then
+            if FileExists(mq.configDir..'\\'..INIFile) then
                 INIFileContents = ReadRawINIFile()
             end
         end
         if ImGui.Button('Refresh Raw INI##rawini') then
-            if FileExists(INIFile) then
+            if FileExists(mq.configDir..'\\'..INIFile) then
                 INIFileContents = ReadRawINIFile()
             end
         end
