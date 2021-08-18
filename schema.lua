@@ -39,7 +39,19 @@ local schema = {
                 Type='SWITCH'
             },
             RezAcceptOn={--switch + extra option 0/1|96
-                Type='STRING'
+                Type='MULTIPART',
+                Parts={
+                    [1]={
+                        Name='On|Off',
+                        Type='SWITCH'
+                    },
+                    [2]={
+                        Name='Min. Pct',
+                        Type='NUMBER',
+                        Min=0,
+                        Max=100
+                    }
+                }
             },
             AcceptInvitesOn={
                 Type='SWITCH'
@@ -55,6 +67,9 @@ local schema = {
             },
             DanNetOn={--switch + extra option
                 Type='STRING'
+            },
+            DanNetDelay={
+                Type='NUMBER'
             },
             MiscGem={
                 Type='NUMBER',
@@ -101,7 +116,6 @@ local schema = {
             }
             --Role
             --GemStuckAbility
-            --DanNetDelay
             --HoTTOn
             --MoveCloserIfNoLOS
             --IRCOn
@@ -161,8 +175,13 @@ local schema = {
             },
             BeforeCombat={
                 Type='SPELL'
+            },
+            TargetSwitchingOn={
+                Type='SWITCH'
+            },
+            DismountDuringFights={
+                Type='SWITCH'
             }
-            --DismountDuringFights
             --TankAllMobs
         }
     },
@@ -260,7 +279,7 @@ local schema = {
             },
             InterruptHeals={
                 Type='NUMBER',
-		Min=0
+                Min=0
             }
         }
     },
@@ -399,7 +418,19 @@ local schema = {
                 Type='STRING'
             },
             PullLevel={
-                Type='STRING'
+                Type='MULTIPART',
+                Parts={
+                    [1]={
+                        Name='Min Level',
+                        Type='NUMBER',
+                        Min=1
+                    },
+                    [2]={
+                        Name='Max Level',
+                        Type='NUMBER',
+                        Min=1
+                    }
+                }
             },
             PullMeleeStick={
                 Type='SWITCH'
@@ -446,8 +477,12 @@ local schema = {
                 Min=0,
                 Max=2
             },
-            --BurnText
-            --UseTribute
+            UseTribute={
+                Type='SWITCH'
+            },
+            BurnText={
+                Type='STRING'
+            }
         }
     },
     AFKTools={
