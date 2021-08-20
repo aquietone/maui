@@ -58,6 +58,46 @@ function LIP.load(fileName)
 	return data;
 end
 
+-- Set an ordered list of sections
+local sections = {
+	'General', 
+	'DPS', 
+	'Heals', 
+	'Buffs', 
+	'Melee', 
+	'Burn', 
+	'Mez', 
+	'AE', 
+	'OhShit', 
+	'Pet', 
+	'Pull', 
+	'Aggro', 
+	'Bandolier', 
+	'Cures', 
+	'GoM', 
+	'Merc', 
+	'AFKTools', 
+	'GMail', 
+	'MySpells', 
+	'SpellSet'
+}
+
+local KeySorter = function(a, b)
+	local aNum = tonumber(a:match('%d+'))
+	local bNum = tonumber(b:match('%d+'))
+	if aNum and bNum and aNum < bNum then
+		return true
+	elseif aNum and bNum and bNum < aNum then
+		return false
+	elseif a < b then
+		return true
+	elseif b > a then
+		return false
+	else
+		return false
+	end
+end
+
 --- Saves all the data from a table to an INI file.
 --@param fileName The name of the INI file to fill. [string]
 --@param data The table containing all the data to store. [table]
@@ -67,28 +107,25 @@ function LIP.save(fileName, data)
 	local file = assert(io.open(fileName, 'w+b'), 'Error loading file :' .. fileName);
 	local contents = '';
 
-	-- sort the section keys
-	local sections = {}
-	for k, v in pairs(data) do table.insert(sections, k) end
-	table.sort(sections)
-
 	for _, sectionKey in ipairs(sections) do
-		contents = contents .. ('[%s]\n'):format(sectionKey);
-		-- sort the keys before writing the file
-		local keys = {}
-		for k, v in pairs(data[sectionKey]) do table.insert(keys, k) end
-		table.sort(keys)
+		if data[sectionKey] and next(data[sectionKey]) ~= nil then
+			contents = contents .. ('[%s]\n'):format(sectionKey);
+			-- sort the keys before writing the file
+			local keys = {}
+			for k, v in pairs(data[sectionKey]) do table.insert(keys, k) end
+			table.sort(keys, KeySorter)
 
-		for _, k in ipairs(keys) do
-			local value = data[sectionKey][k]
-			if value == true then
-				value = 1
-			elseif value == false then
-				value = 0
+			for _, k in ipairs(keys) do
+				local value = data[sectionKey][k]
+				if value == true then
+					value = 1
+				elseif value == false then
+					value = 0
+				end
+				contents = contents .. ('%s=%s\n'):format(k, tostring(value));
 			end
-			contents = contents .. ('%s=%s\n'):format(k, tostring(value));
+			contents = contents .. '\n';
 		end
-		contents = contents .. '\n';
 	end
 	file:write(contents);
 	file:close();
