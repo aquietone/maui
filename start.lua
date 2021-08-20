@@ -30,15 +30,29 @@ local spellIter, aaIter, discIter = 1,1,1
 local spells, altAbilities, discs = {categories={}},{},{}
 
 -- Helper functions
-local Split = function(input, sep)
-    if sep == nil then
-        sep = "|"
+local Split = function(input, sep, limit, bRegexp)
+    assert(sep ~= '')
+    assert(limit == nil or limit >= 1)
+ 
+    local aRecord = {}
+ 
+    if input:len() > 0 then
+       local bPlain = not bRegexp
+       limit = limit or -1
+ 
+       local nField, nStart = 1, 1
+       local nFirst,nLast = input:find(sep, nStart, bPlain)
+       while nFirst and limit ~= 0 do
+          aRecord[nField] = input:sub(nStart, nFirst-1)
+          nField = nField+1
+          nStart = nLast+1
+          nFirst,nLast = input:find(sep, nStart, bPlain)
+          limit = limit-1
+       end
+       aRecord[nField] = input:sub(nStart)
     end
-    local t={}
-    for str in string.gmatch(input, "([^"..sep.."]+)") do
-        table.insert(t, str)
-    end
-    return t
+ 
+    return aRecord
 end
 
 local JoinStrings = function(t, sep, start)
@@ -82,6 +96,34 @@ local FindINIFileName = function()
         until fileLevel == myLevel-10
     end
     return nil
+end
+
+-- convert INI 0/1 to true/false for ImGui checkboxes
+local InitCheckBoxValue = function(value)
+    if value then
+        if type(value) == 'boolean' then return value end
+        if type(value) == 'number' then return value ~= 0 end
+    else
+        return false
+    end
+end
+
+local Save = function()
+    -- Set "NULL" string values to nil so they aren't saved
+    for sectionName,sectionProperties in pairs(config) do
+        for key,value in pairs(sectionProperties) do
+            if value == 'NULL' then
+                -- Replace and XYZCond#=FALSE with nil as well if no corresponding XYZ# value
+                local word = string.match(key, '[^%d]+')
+                local number = string.match(key, '%d+')
+                if number then
+                    config[sectionName][word..'Cond'..number] = nil
+                end
+                config[sectionName][key] = nil
+            end
+        end
+    end
+    LIP.save(mq.configDir..'\\'..INIFile, config)
 end
 
 -- Ability menu initializers
@@ -252,7 +294,7 @@ local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
     if not config[sectionName][key..index] then
         config[sectionName][key..index] = ''
     end
-    local valueParts = Split(config[sectionName][key..index])
+    local valueParts = Split(config[sectionName][key..index],'|',1)
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
@@ -262,7 +304,7 @@ local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
                 if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
                     for _,subcategory in ipairs(spells[category].subcategories) do
                         -- Subcategory Spell menu
-                        if ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
+                        if #spells[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
                             for _,spell in ipairs(spells[category][subcategory]) do
                                 local spellLevel = mq.TLO.Spell(spell).Level()
                                 SetSpellTextColor(spell)
@@ -306,59 +348,70 @@ local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
     end
 end
 
+local DrawSelectedSpellUpgradeButton = function(spell, selectedIdx)
+    local upgradeValue = nil
+    -- Avoid finding the upgrade more than once
+    if not selectedUpgrade[selectedIdx] then
+        selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
+    end
+    -- Upgrade found? display the upgrade button
+    if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
+        if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
+            upgradeValue = selectedUpgrade[selectedIdx]
+            selectedUpgrade[selectedIdx] = nil
+        end
+    end
+    return upgradeValue
+end
+
+local DrawKeyAndInputText = function(keyText, label, value)
+    ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
+    ImGui.Text(keyText)
+    ImGui.PopStyleColor()
+    ImGui.SameLine()
+    ImGui.SetCursorPosX(175)
+    -- the first part, spell/item/disc name, /command, etc
+    return ImGui.InputText(label, value)
+end
+
 -- Draw the value and condition of the selected list item
 local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     local valueKey = key..selected[selectedIdx]
-    local valueCondKey = key..'Cond'..selected[selectedIdx]
     -- make sure values not nil so imgui inputs don't barf
     if config[sectionName][valueKey] == nil then
         config[sectionName][valueKey] = 'NULL'
     end
     -- split the value so we can update spell name and stuff after the | individually
-    local valueParts = Split(config[sectionName][valueKey])
+    local valueParts = Split(config[sectionName][valueKey], '|', 1)
+    -- the first part, spell/item/disc name, /command, etc
     if not valueParts[1] then valueParts[1] = '' end
-    local optionsInput = JoinStrings(valueParts, '|', 2) or ''
+    -- the rest of the stuff after the first |, classes, percents, oog, etc
+    if not valueParts[2] then valueParts[2] = '' end
 
     ImGui.Separator()
-    ImGui.Text(string.format('%s.%s%d', sectionName, key, selected[selectedIdx]))
-    ImGui.Text('Value: ')
-    ImGui.SameLine()
-    ImGui.SetCursorPosX(175)
-    -- the first part, spell/item/disc name, /command, etc
-    valueParts[1] = ImGui.InputText('##'..sectionName..valueKey, valueParts[1])
-    ImGui.Text('Options: ')
-    ImGui.SameLine()
-    ImGui.SetCursorPosX(175)
-    -- the rest of the stuff after the first |, classes, percents, oog, etc
-    optionsInput = ImGui.InputText('##'..sectionName..valueKey..'options', optionsInput)
+    ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 1, 1)
+    ImGui.Text(string.format('%s%d', key, selected[selectedIdx]))
+    ImGui.PopStyleColor()
+    valueParts[1] = DrawKeyAndInputText('Name: ', '##'..sectionName..valueKey, valueParts[1])
+    -- prevent | in the ability name field, or else things get ugly in the options field
+    if valueParts[1]:find('|') then valueParts[1] = valueParts[1]:match('[^|]+') end
+    valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2])
     if value['Conditions'] then
-        ImGui.Text('Condition: ')
-        ImGui.SameLine()
+        local valueCondKey = key..'Cond'..selected[selectedIdx]
         if config[sectionName][valueCondKey] == nil then
             config[sectionName][valueCondKey] = 'NULL'
         end
-        ImGui.SetCursorPosX(175)
-        config[sectionName][valueCondKey] = ImGui.InputText('##cond'..sectionName..valueKey, config[sectionName][valueCondKey])
+        config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, config[sectionName][valueCondKey])
     end
-    -- TODO: There's probably better ways to handle finding and displaying the upgrade spell button...
     local spell = mq.TLO.Spell(valueParts[1])
-    if spell() then
-        -- Avoid finding the upgrade more than once
-        if not selectedUpgrade[selectedIdx] then
-            selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
-        end
-        -- Upgrade found? display the upgrade button
-        if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
-            if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
-                valueParts[1] = selectedUpgrade[selectedIdx]
-                selectedUpgrade[selectedIdx] = nil
-            end
-        end
+    if mq.TLO.Me.Book(spell.RankName())() then
+        local upgradeResult = DrawSelectedSpellUpgradeButton(spell, selectedIdx)
+        if upgradeResult then valueParts[1] = upgradeResult end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
         config[sectionName][valueKey] = valueParts[1]
-        if optionsInput and string.len(optionsInput) > 0 then
-            config[sectionName][valueKey] = config[sectionName][valueKey]..'|'..optionsInput:gsub('|$','')
+        if valueParts[2] and string.len(valueParts[2]) > 0 then
+            config[sectionName][valueKey] = config[sectionName][valueKey]..'|'..valueParts[2]:gsub('|$','')
         end
     else
         config[sectionName][valueKey] = ''
@@ -366,10 +419,30 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     ImGui.Separator()
 end
 
+local DrawPlainListButton = function(sectionName, key, listIdx, selectedIdx)
+    -- INI value is set to non-spell/item
+    if ImGui.Button(listIdx..'##'..sectionName..key, 30, 30) then
+        if selectedIdx >= 0 then
+            selected[selectedIdx] = listIdx
+            selectedUpgrade[selectedIdx] = nil
+        end
+    end
+end
+
+local DrawTooltip = function(text)
+    if ImGui.IsItemHovered() and text and string.len(text) > 0 then
+        ImGui.BeginTooltip()
+        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
+        ImGui.Text(text)
+        ImGui.PopTextWrapPos()
+        ImGui.EndTooltip()
+    end
+end
+
 local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
     local iniValue = config[sectionName][key..index]
     if iniValue and iniValue ~= 'NULL' then
-        local iniValueParts = Split(iniValue,'|')
+        local iniValueParts = Split(iniValue,'|',1)
         -- Use first part of INI value as spell or item name to lookup icon
         if mq.TLO.Spell(iniValueParts[1])() then
             local spellIcon = mq.TLO.Spell(iniValueParts[1]).SpellIcon()
@@ -380,21 +453,9 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, 30, 30)
         else
-            -- INI value is set to non-spell/item
-            if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-                if selectedIdx >= 0 then
-                    selected[selectedIdx] = index
-                    selectedUpgrade[selectedIdx] = nil
-                end
-            end
+            DrawPlainListButton(sectionName, key, index, selectedIdx)
         end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
-            ImGui.Text(iniValueParts[1])
-            ImGui.PopTextWrapPos()
-            ImGui.EndTooltip()
-        end
+        DrawTooltip(iniValueParts[1])
         -- Handle clicks on spell icon animations that aren't buttons
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
             if selectedIdx >= 0 then 
@@ -405,19 +466,16 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
         -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index, selectedIdx)
     else
-        if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-            if selectedIdx >= 0 then
-                selected[selectedIdx] = index
-                selectedUpgrade[selectedIdx] = nil
-            end
-        end
+        DrawPlainListButton(sectionName, key, index, selectedIdx)
         DrawSpellPicker(sectionName, key, index, selectedIdx)
     end
 end
 
 -- Draw 0..N buttons based on value of XYZSize input
 local DrawList = function(sectionName, key, value, selectedIdx)
+    ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..'Size: ')
+    ImGui.PopStyleColor()
     ImGui.SameLine()
     ImGui.PushItemWidth(100)
     if config[sectionName][key..'Size'] == nil then
@@ -447,19 +505,42 @@ local DrawList = function(sectionName, key, value, selectedIdx)
     end
 end
 
--- convert INI 0/1 to true/false for ImGui checkboxes
-local InitCheckBoxValue = function(value)
-    if not value or value == 0 or value == 'NULL' then
-        return false
-    elseif value == 1 then
-        return true
+local DrawMultiPartProperty = function(sectionName, key, value)
+    -- TODO: what's a nice clean way to represent values which are multiple parts? 
+    -- Currently just using this experimentally with RezAcceptOn
+    local parts = Split(config[sectionName][key], '|')
+    for partIdx,part in ipairs(value['Parts']) do
+        if part['Type'] == 'SWITCH' then
+            ImGui.Text(part['Name']..': ')
+            ImGui.SameLine()
+            parts[partIdx] = ImGui.Checkbox('##'..key, InitCheckBoxValue(tonumber(parts[partIdx])))
+            if parts[partIdx] then parts[partIdx] = '1' else parts[partIdx] = '0' end
+        elseif part['Type'] == 'NUMBER' then
+            if not parts[partIdx] or parts[partIdx] == 'NULL' then parts[partIdx] = 0 end
+            ImGui.Text(part['Name']..': ')
+            ImGui.SameLine()
+            ImGui.PushItemWidth(100)
+            parts[partIdx] = ImGui.InputInt('##'..sectionName..key..partIdx, tonumber(parts[partIdx]))
+            ImGui.PopItemWidth()
+            if part['Min'] and parts[partIdx] < part['Min'] then
+                parts[partIdx] = part['Min']
+            elseif part['Max'] and parts[partIdx] > part['Max'] then
+                parts[partIdx] = part['Max']
+            end
+            parts[partIdx] = tostring(parts[partIdx])
+        end
+        config[sectionName][key] = table.concat(parts, '|')
+        if partIdx == 1 then
+            ImGui.SameLine()
+        end
     end
-    return value
 end
 
 -- Draw a generic section key/value property
 local DrawProperty = function(sectionName, key, value)
+    ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..': ')
+    ImGui.PopStyleColor()
     ImGui.SameLine()
     if config[sectionName][key] == nil then
         config[sectionName][key] = 'NULL'
@@ -488,34 +569,7 @@ local DrawProperty = function(sectionName, key, value)
         config[sectionName][key] = ImGui.InputText('##'..sectionName..key, tostring(config[sectionName][key]))
         ImGui.PopItemWidth()
     elseif value['Type'] == 'MULTIPART' then
-        -- TODO: what's a nice clean way to represent values which are multiple parts? 
-        -- Currently just using this experimentally with RezAcceptOn
-        local parts = Split(config[sectionName][key])
-        for partIdx,part in ipairs(value['Parts']) do
-            if part['Type'] == 'SWITCH' then
-                ImGui.Text(part['Name']..': ')
-                ImGui.SameLine()
-                parts[partIdx] = ImGui.Checkbox('##'..key, InitCheckBoxValue(tonumber(parts[partIdx])))
-                if parts[partIdx] then parts[partIdx] = '1' else parts[partIdx] = '0' end
-            elseif part['Type'] == 'NUMBER' then
-                if not parts[partIdx] or parts[partIdx] == 'NULL' then parts[partIdx] = 0 end
-                ImGui.Text(part['Name']..': ')
-                ImGui.SameLine()
-                ImGui.PushItemWidth(100)
-                parts[partIdx] = ImGui.InputInt('##'..sectionName..key..partIdx, tonumber(parts[partIdx]))
-                ImGui.PopItemWidth()
-                if part['Min'] and parts[partIdx] < part['Min'] then
-                    parts[partIdx] = part['Min']
-                elseif part['Max'] and parts[partIdx] > part['Max'] then
-                    parts[partIdx] = part['Max']
-                end
-                parts[partIdx] = tostring(parts[partIdx])
-            end
-            config[sectionName][key] = table.concat(parts, '|')
-            if partIdx == 1 then
-                ImGui.SameLine()
-            end
-        end
+        DrawMultiPartProperty(sectionName, key, value)
     end
 end
 
@@ -572,24 +626,6 @@ local DrawSection = function(sectionName, sectionProperties)
     end
 end
 
-local function Save()
-    -- Set "NULL" string values to nil so they aren't saved
-    for sectionName,sectionProperties in pairs(config) do
-        for key,value in pairs(sectionProperties) do
-            if value == 'NULL' then
-                -- Replace and XYZCond#=FALSE with nil as well if no corresponding XYZ# value
-                local word = string.match(key, '[^%d]+')
-                local number = string.match(key, '%d+')
-                if number then
-                    config[sectionName][word..'Cond'..number] = nil
-                end
-                config[sectionName][key] = nil
-            end
-        end
-    end
-    LIP.save(mq.configDir..'\\'..INIFile, config)
-end
-
 local DrawRawINIEditTab = function()
     if ImGui.BeginChild('rawiniwindow') then
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
@@ -614,6 +650,25 @@ local DrawRawINIEditTab = function()
     ImGui.EndTabItem()
 end
 
+local DrawWindowTabBar = function()
+    if ImGui.BeginTabBar('Settings') then
+        for _,sectionName in ipairs(schema.Sections) do
+            if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
+                if ImGui.BeginTabItem(sectionName) then
+                    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+                        selected = {0,0,0,0,0}
+                    end
+                    DrawSection(sectionName, schema[sectionName])
+                    ImGui.EndTabItem()
+                end
+            end
+        end
+        if ImGui.BeginTabItem('Raw') then
+            DrawRawINIEditTab()
+        end
+    end
+end
+
 local DrawWindowHeaderSettings = function()
     ImGui.Text('INI File: ')
     ImGui.SameLine()
@@ -636,25 +691,6 @@ local DrawWindowHeaderSettings = function()
         mq.cmd(StartCommand)
     end
     ImGui.Separator()
-end
-
-local DrawWindowTabBar = function()
-    if ImGui.BeginTabBar('Settings') then
-        for sectionName,sectionProperties in pairs(schema) do
-            if not schema[sectionName].Classes or schema[sectionName].Classes[myClass] then
-                if ImGui.BeginTabItem(sectionName) then
-                    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                        selected = {0,0,0,0,0}
-                    end
-                    DrawSection(sectionName, sectionProperties)
-                    ImGui.EndTabItem()
-                end
-            end
-        end
-        if ImGui.BeginTabItem('Raw') then
-            DrawRawINIEditTab()
-        end
-    end
 end
 
 local MAUI = function()

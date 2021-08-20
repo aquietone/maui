@@ -1,4 +1,27 @@
 local schema = {
+    -- Array For tab and INI ordering purposes
+    Sections = {
+        'General', 
+        'DPS', 
+        'Heals', 
+        'Buffs', 
+        'Melee', 
+        'Burn', 
+        'Mez', 
+        'AE', 
+        'OhShit', 
+        'Pet', 
+        'Pull', 
+        'Aggro', 
+        'Bandolier', 
+        'Cures', 
+        'GoM', 
+        'Merc', 
+        'AFKTools', 
+        'GMail', 
+        'MySpells', 
+        'SpellSet'
+    },
     General={
         Properties={
             CampRadius={
