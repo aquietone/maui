@@ -108,23 +108,24 @@ function LIP.save(fileName, data)
 	local contents = '';
 
 	for _, sectionKey in ipairs(sections) do
-		contents = contents .. ('[%s]\n'):format(sectionKey);
-		-- sort the keys before writing the file
-		local keys = {}
-		print(sectionKey)
-		for k, v in pairs(data[sectionKey]) do table.insert(keys, k) end
-		table.sort(keys, KeySorter)
+		if data[sectionKey] and next(data[sectionKey]) ~= nil then
+			contents = contents .. ('[%s]\n'):format(sectionKey);
+			-- sort the keys before writing the file
+			local keys = {}
+			for k, v in pairs(data[sectionKey]) do table.insert(keys, k) end
+			table.sort(keys, KeySorter)
 
-		for _, k in ipairs(keys) do
-			local value = data[sectionKey][k]
-			if value == true then
-				value = 1
-			elseif value == false then
-				value = 0
+			for _, k in ipairs(keys) do
+				local value = data[sectionKey][k]
+				if value == true then
+					value = 1
+				elseif value == false then
+					value = 0
+				end
+				contents = contents .. ('%s=%s\n'):format(k, tostring(value));
 			end
-			contents = contents .. ('%s=%s\n'):format(k, tostring(value));
+			contents = contents .. '\n';
 		end
-		contents = contents .. '\n';
 	end
 	file:write(contents);
 	file:close();
