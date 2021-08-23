@@ -30,7 +30,7 @@ local spellIter, aaIter, discIter = 1,1,1
 local spells, altAbilities, discs = {categories={}},{},{}
 
 -- Helper functions
-local Split = function(input, sep, limit, bRegexp)
+local function Split(input, sep, limit, bRegexp)
     assert(sep ~= '')
     assert(limit == nil or limit >= 1)
  
@@ -55,7 +55,7 @@ local Split = function(input, sep, limit, bRegexp)
     return aRecord
 end
 
-local JoinStrings = function(t, sep, start)
+local function JoinStrings(t, sep, start)
     local result = t[start]
     for i=start+1,#t do
         result = result..'|'..t[i]
@@ -63,25 +63,25 @@ local JoinStrings = function(t, sep, start)
     return result
 end
 
-local ReadRawINIFile = function()
+local function ReadRawINIFile()
     local f = io.open(mq.configDir..'\\'..INIFile, 'r')
     local contents = f:read('*a')
     io.close(f)
     return contents
 end
 
-local WriteRawINIFile = function(contents)
+local function WriteRawINIFile(contents)
     local f = io.open(mq.configDir..'\\'..INIFile, 'w')
     f:write(contents)
     io.close(f)
 end
 
-local FileExists = function(path)
+local function FileExists(path)
     local f = io.open(path, "r")
     if f ~= nil then io.close(f) return true else return false end
 end
 
-local FindINIFileName = function()
+local function FindINIFileName()
     if FileExists(mq.configDir..'\\'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)) then
         return string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
     elseif FileExists(mq.configDir..'\\'..string.format('MuleAssist_%s_%s.ini', myServer, myName)) then
@@ -99,7 +99,7 @@ local FindINIFileName = function()
 end
 
 -- convert INI 0/1 to true/false for ImGui checkboxes
-local InitCheckBoxValue = function(value)
+local function InitCheckBoxValue(value)
     if value then
         if type(value) == 'boolean' then return value end
         if type(value) == 'number' then return value ~= 0 end
@@ -108,7 +108,7 @@ local InitCheckBoxValue = function(value)
     end
 end
 
-local Save = function()
+local function Save()
     -- Set "NULL" string values to nil so they aren't saved
     for sectionName,sectionProperties in pairs(config) do
         for key,value in pairs(sectionProperties) do
@@ -127,7 +127,7 @@ local Save = function()
 end
 
 -- Ability menu initializers
-local InitSpellTree = function()
+local function InitSpellTree()
     -- Sort spells by level
     local SpellSorter = function(a, b)
         if mq.TLO.Spell(a).Level() < mq.TLO.Spell(b).Level() then
@@ -170,7 +170,7 @@ local InitSpellTree = function()
     end
 end
 
-local InitAATree = function()
+local function InitAATree()
     -- TODO: what's the right way to loop through activated abilities?
     for aaIter=1,10000 do
         if mq.TLO.Me.AltAbility(aaIter)() and mq.TLO.Me.AltAbility(aaIter).Spell() then
@@ -181,7 +181,7 @@ local InitAATree = function()
     table.sort(altAbilities)
 end
 
-local InitDiscTree = function()
+local function InitDiscTree()
     -- Build disc tree for picking discs
     -- TODO: split up by timers? haven't really looked at discs yet
     repeat
@@ -193,7 +193,7 @@ local InitDiscTree = function()
 end
 
 --Given some spell data input, determine whether a better spell with the same inputs exists
-local GetSpellUpgrade = function(targetType, subCat, numEffects, minLevel)
+local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
     local max = 0
     local max2 = 0
     local maxName = ''
@@ -262,7 +262,7 @@ end
 -- ImGui functions
 
 -- Color spell names in spell picker similar to the spell bar context menus
-local SetSpellTextColor = function(spell)
+local function SetSpellTextColor(spell)
     local target = mq.TLO.Spell(spell).TargetType()
     if target == 'Single' or target == 'Line of Sight' or target == 'Undead' then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
@@ -290,7 +290,7 @@ end
 -- Recreate the spell bar context menu
 -- sectionName+key+index defines where to store the result
 -- selectedIdx is used to clear spell upgrade input incase of updating over an existing entry
-local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
+local function DrawSpellPicker(sectionName, key, index, selectedIdx)
     if not config[sectionName][key..index] then
         config[sectionName][key..index] = ''
     end
@@ -348,7 +348,7 @@ local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
     end
 end
 
-local DrawSelectedSpellUpgradeButton = function(spell, selectedIdx)
+local function DrawSelectedSpellUpgradeButton(spell, selectedIdx)
     local upgradeValue = nil
     -- Avoid finding the upgrade more than once
     if not selectedUpgrade[selectedIdx] then
@@ -364,7 +364,7 @@ local DrawSelectedSpellUpgradeButton = function(spell, selectedIdx)
     return upgradeValue
 end
 
-local DrawKeyAndInputText = function(keyText, label, value)
+local function DrawKeyAndInputText(keyText, label, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(keyText)
     ImGui.PopStyleColor()
@@ -375,7 +375,7 @@ local DrawKeyAndInputText = function(keyText, label, value)
 end
 
 -- Draw the value and condition of the selected list item
-local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
+local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     local valueKey = key..selected[selectedIdx]
     -- make sure values not nil so imgui inputs don't barf
     if config[sectionName][valueKey] == nil then
@@ -419,7 +419,7 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     ImGui.Separator()
 end
 
-local DrawPlainListButton = function(sectionName, key, listIdx, selectedIdx)
+local function DrawPlainListButton(sectionName, key, listIdx, selectedIdx)
     -- INI value is set to non-spell/item
     if ImGui.Button(listIdx..'##'..sectionName..key, 30, 30) then
         if selectedIdx >= 0 then
@@ -429,7 +429,7 @@ local DrawPlainListButton = function(sectionName, key, listIdx, selectedIdx)
     end
 end
 
-local DrawTooltip = function(text)
+local function DrawTooltip(text)
     if ImGui.IsItemHovered() and text and string.len(text) > 0 then
         ImGui.BeginTooltip()
         ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
@@ -439,7 +439,7 @@ local DrawTooltip = function(text)
     end
 end
 
-local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
+local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
     local iniValue = config[sectionName][key..index]
     if iniValue and iniValue ~= 'NULL' then
         local iniValueParts = Split(iniValue,'|',1)
@@ -472,7 +472,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
 end
 
 -- Draw 0..N buttons based on value of XYZSize input
-local DrawList = function(sectionName, key, value, selectedIdx)
+local function DrawList(sectionName, key, value, selectedIdx)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..'Size: ')
     ImGui.PopStyleColor()
@@ -505,7 +505,7 @@ local DrawList = function(sectionName, key, value, selectedIdx)
     end
 end
 
-local DrawMultiPartProperty = function(sectionName, key, value)
+local function DrawMultiPartProperty(sectionName, key, value)
     -- TODO: what's a nice clean way to represent values which are multiple parts? 
     -- Currently just using this experimentally with RezAcceptOn
     local parts = Split(config[sectionName][key], '|')
@@ -537,7 +537,7 @@ local DrawMultiPartProperty = function(sectionName, key, value)
 end
 
 -- Draw a generic section key/value property
-local DrawProperty = function(sectionName, key, value)
+local function DrawProperty(sectionName, key, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..': ')
     ImGui.PopStyleColor()
@@ -574,7 +574,7 @@ local DrawProperty = function(sectionName, key, value)
 end
 
 -- Draw main On/Off switches for an INI section
-local DrawSectionControlSwitches = function(sectionName, sectionProperties)
+local function DrawSectionControlSwitches(sectionName, sectionProperties)
     if sectionProperties['On'] then
         if sectionProperties['On']['Type'] == 'SWITCH' then
             config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', InitCheckBoxValue(config[sectionName][sectionName..'On']))
@@ -599,7 +599,7 @@ local DrawSectionControlSwitches = function(sectionName, sectionProperties)
 end
 
 -- Draw an INI section tab
-local DrawSection = function(sectionName, sectionProperties)
+local function DrawSection(sectionName, sectionProperties)
     if not config[sectionName] then
         config[sectionName] = {}
     end
@@ -626,7 +626,7 @@ local DrawSection = function(sectionName, sectionProperties)
     end
 end
 
-local DrawRawINIEditTab = function()
+local function DrawRawINIEditTab()
     if ImGui.BeginChild('rawiniwindow') then
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
             if FileExists(mq.configDir..'\\'..INIFile) then
@@ -650,7 +650,7 @@ local DrawRawINIEditTab = function()
     ImGui.EndTabItem()
 end
 
-local DrawWindowTabBar = function()
+local function DrawWindowTabBar()
     if ImGui.BeginTabBar('Settings') then
         for _,sectionName in ipairs(schema.Sections) do
             if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
@@ -669,7 +669,7 @@ local DrawWindowTabBar = function()
     end
 end
 
-local DrawWindowHeaderSettings = function()
+local function DrawWindowHeaderSettings()
     ImGui.Text('INI File: ')
     ImGui.SameLine()
     INIFile,_ = ImGui.InputText('##INIInput', INIFile)

@@ -20,46 +20,46 @@ local schema = {
         'AFKTools', 
         'GMail', 
         'MySpells', 
-        'SpellSet'
+        'SpellSet',
     },
     General={
         Properties={
             CampRadius={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             CampRadiusExceed={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             ReturnToCamp={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ReturnToCampAccuracy={
                 Type='NUMBER',
-                Min=5
+                Min=5,
             },
             ChaseAssist={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ChaseDistance={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             MedOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             MedStart={
                 Type='NUMBER',
                 Min=0,
-                Max=100
+                Max=100,
             },
             SitToMed={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             LootOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             RezAcceptOn={--switch + extra option 0/1|96
                 Type='MULTIPART',
@@ -72,70 +72,70 @@ local schema = {
                         Name='Min. Pct',
                         Type='NUMBER',
                         Min=0,
-                        Max=100
-                    }
-                }
+                        Max=100,
+                    },
+                },
             },
             AcceptInvitesOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             GroupWatchOn={--switch + extra options 0/1/2/3|MedAt%|Classes
-                Type='STRING'
+                Type='STRING',
             },
             CastingInterruptOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             EQBCOn={--switch + extra option
-                Type='STRING'
+                Type='STRING',
             },
             DanNetOn={--switch + extra option
-                Type='STRING'
+                Type='STRING',
             },
             DanNetDelay={
-                Type='NUMBER'
+                Type='NUMBER',
             },
             MiscGem={
                 Type='NUMBER',
                 Min=1,
-                Max=13
+                Max=13,
             },
             MiscGemLW={
                 Type='NUMBER',
                 Min=1,
-                Max=13
+                Max=13,
             },
             MiscGemRemem={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             TwistOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             TwistMed={
-                Type='STRING'
+                Type='STRING',
             },
             TwistWhat={
-                Type='STRING'
+                Type='STRING',
             },
             GroupEscapeOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             CampfireOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             DPSMeter={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ScatterOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             CheerPeople={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BeepOnNamed={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BuffWhileChasing={
-                Type='SWITCH'
+                Type='SWITCH',
             }
             --Role
             --GemStuckAbility
@@ -152,293 +152,293 @@ local schema = {
             LoadSpellSet={
                 Type='NUMBER',
                 Min=0,
-                Max=2
+                Max=2,
             },
             SpellSetName={
                 Type='STRING'
-            }
-        }
+            },
+        },
     },
     Melee={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             AssistAt={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             FaceMobOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             MeleeDistance={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             StickHow={
-                Type='STRING'
+                Type='STRING',
             },
             MeleeTwistOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             MeleeTwistWhat={
-                Type='STRING'
+                Type='STRING',
             },
             AutoFireOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             UseMQ2Melee={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             Autohide={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BeforeCombat={
-                Type='SPELL'
+                Type='SPELL',
             },
             TargetSwitchingOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             DismountDuringFights={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
             --TankAllMobs
-        }
+        },
     },
     DPS={
         Controls={
             On={
                 Type='NUMBER',
                 Min=0,
-                Max=2
+                Max=2,
             },
-            COn=true
+            COn=true,
         },
         Properties={
             DPS={
                 Type='LIST',
                 Max=40,
-                Conditions=true
+                Conditions=true,
             },
             DPSSkip={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             DPSInterval={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             DebuffAllOn={
                 Type='NUMBER',
                 Min=0,
-                Max=2
-            }
-        }
+                Max=2,
+            },
+        },
     },
     Buffs={
         Controls={
             On={
-                Type='SWITCH'
+                Type='SWITCH',
             },
-            COn=true
+            COn=true,
         },
         Properties={
             Buffs={
                 Type='LIST',
                 Max=20,
-                Conditions=true
+                Conditions=true,
             },
             RebuffOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             CheckBuffsTimer={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             PowerSource={
-                Type='STRING'
+                Type='STRING',
             },
             BegOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BegPermissions={
-                Type='STRING'
+                Type='STRING',
             },
             Beg={
                 Type='LIST',
                 Max=20,
-                Conditions=false
-            }
+                Conditions=false,
+            },
         }
     },
     Heals={
         Controls={
             On={
-                Type='SWITCH'
+                Type='SWITCH',
             },
-            COn=true
+            COn=true,
         },
         Properties={
             Heals={
                 Type='LIST',
                 Max=15,
-                Conditions=true
+                Conditions=true,
             },
             XTarHeal={
-                Type='STRING'
+                Type='STRING',
             },
             AutoRezOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             AutoRezWith={
-                Type='SPELL'
+                Type='SPELL',
             },
             HealGroupPetsOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             InterruptHeals={
                 Type='NUMBER',
-                Min=0
-            }
-        }
+                Min=0,
+            },
+        },
     },
     Cures={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             Cures={
                 Type='LIST',
                 Max=5,
-                Conditions=true
-            }
-        }
+                Conditions=true,
+            },
+        },
     },
     Mez={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Classes={brd=1,enc=1},
         Properties={
             MezRadius={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             MezMinLevel={
                 Type='NUMBER',
-                Min=1
+                Min=1,
             },
             MezMaxLevel={
                 Type='NUMBER',
-                Min=1
+                Min=1,
             },
             MezStopHPs={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             MezSpell={
-                Type='SPELL'
+                Type='SPELL',
             },
             MezAESpell={
-                Type='SPELL'
+                Type='SPELL',
             }
         }
     },
     Pet={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             PetSpell={
-                Type='SPELL'
+                Type='SPELL',
             },
             PetFocus={
-                Type='SPELL'
+                Type='SPELL',
             },
             PetShrinkOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PetShrinkSpell={
-                Type='SPELL'
+                Type='SPELL',
             },
             PetHoldOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PetBuffsOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PetBuffs={
                 Type='LIST',
                 Max=8,
-                Conditions=false
+                Conditions=false,
             },
             PetCombatOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PetAssistAt={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             PetBreakMezSpell={
-                Type='SPELL'
+                Type='SPELL',
             },
             PetRampPullWait={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PetSuspend={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             MoveWhenHit={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
             --PetToysSize
         }
     },
     Pull={
         Properties={
             PullWith={
-                Type='STRING'
+                Type='STRING',
             },
             MaxRadius={
                 Type='NUMBER',
-                Min=1
+                Min=1,
             },
             MaxZRange={
                 Type='NUMBER',
-                Min=1
+                Min=1,
             },
             PullWait={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             PullRoleToggle={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PullTwistOn={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ChainPull={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ChainPullHP={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             PullPause={
-                Type='STRING'
+                Type='STRING',
             },
             PullLevel={
                 Type='MULTIPART',
@@ -446,158 +446,158 @@ local schema = {
                     [1]={
                         Name='Min Level',
                         Type='NUMBER',
-                        Min=1
+                        Min=1,
                     },
                     [2]={
                         Name='Max Level',
                         Type='NUMBER',
-                        Min=1
-                    }
-                }
+                        Min=1,
+                    },
+                },
             },
             PullMeleeStick={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             UseWayPointZ={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             PullArcWidth={
                 Type='NUMBER',
                 Min=0,
-                Max=360
-            }
-        }
+                Max=360,
+            },
+        },
     },
     Merc={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             MercAssistAt={
                 Type='NUMBER',
                 Min=1,
-                Max=100
+                Max=100,
             },
             AutoRevive={
-                Type='SWITCH'
-            }
-        }
+                Type='SWITCH',
+            },
+        },
     },
     Burn={
         Controls={
-            COn=true
+            COn=true,
         },
         Properties={
             Burn={
                 Type='LIST',
                 Max=15,
-                Conditions=true
+                Conditions=true,
             },
             BurnAllNamed={
                 Type='NUMBER',
                 Min=0,
-                Max=2
+                Max=2,
             },
             UseTribute={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BurnText={
-                Type='STRING'
-            }
-        }
+                Type='STRING',
+            },
+        },
     },
     AFKTools={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             AFKGMAction={
                 Type='NUMBER',
                 Min=0,
-                Max=4
+                Max=4,
             },
             AFKPCRadius={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             CampOnDeath={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             ClickBackToCamp={
-                Type='SWITCH'
+                Type='SWITCH',
             },
             BeepOnNamed={
-                Type='SWITCH'
-            }
-        }
+                Type='SWITCH',
+            },
+        },
     },
     GoM={
         Controls={
             On={
-                Type='SWITCH'
+                Type='SWITCH',
             },
-            COn=true
+            COn=true,
         },
         Properties={
             GoM={
                 Type='LIST',
                 Max=5,
-                Conditions=true
-            }
-        }
+                Conditions=true,
+            },
+        },
     },
     AE={
         Controls={
             On={
-                Type='SWITCH'
-            }
+                Type='SWITCH',
+            },
         },
         Properties={
             AERadius={
                 Type='NUMBER',
-                Min=0
+                Min=0,
             },
             AE={
                 Type='LIST',
                 Max=10,
-                Conditions=false
-            }
-        }
+                Conditions=false,
+            },
+        },
     },
     Aggro={
         Controls={
             On={
-                Type='SWITCH'
+                Type='SWITCH',
             },
-            COn=true
+            COn=true,
         },
         Properties={
             Aggro={
                 Type='LIST',
                 Max=5,
-                Conditions=true
-            }
-        }
+                Conditions=true,
+            },
+        },
     },
     OhShit={
         Controls={
             On={
-                Type='SWITCH'
+                Type='SWITCH',
             },
-            COn=true
+            COn=true,
         },
         Properties={
             OhShit={
                 Type='LIST',
                 Max=10,
-                Conditions=true
-            }
-        }
-    }
+                Conditions=true,
+            },
+        },
+    },
     -- Gmail
     -- Bandolier
 }
