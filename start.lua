@@ -699,12 +699,9 @@ local MAUI = function()
     if shouldDrawUI then
         DrawWindowHeaderSettings()
         DrawWindowTabBar()
-        
-        if not open then
-            terminate = true
-        end
     end
     ImGui.End()
+    if not open then terminate = true end
 end
 
 -- Load INI into table as well as raw content
