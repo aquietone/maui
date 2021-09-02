@@ -62,6 +62,10 @@ local schema = {
                 Type='SWITCH',
             },
             RezAcceptOn={--switch + extra option 0/1|96
+                Type='STRING',
+            },
+	    --[[
+            RezAcceptOn={--switch + extra option 0/1|96
                 Type='MULTIPART',
                 Parts={
                     [1]={
@@ -76,6 +80,7 @@ local schema = {
                     },
                 },
             },
+	    --]]
             AcceptInvitesOn={
                 Type='SWITCH',
             },
