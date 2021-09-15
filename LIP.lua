@@ -29,7 +29,7 @@ local schema = require 'ma.schema'
 --- Returns a table containing all the data from the INI file.
 --@param fileName The name of the INI file to parse. [string]
 --@return The table containing all data from the INI file. [table]
-function LIP.load(fileName)
+function LIP.load(fileName, initNilValues)
 	assert(type(fileName) == 'string', 'Parameter "fileName" must be a string.');
 	local file = assert(io.open(fileName, 'r'), 'Error loading file : ' .. fileName);
 	local data = {};
@@ -40,7 +40,11 @@ function LIP.load(fileName)
 			section = tonumber(tempSection) and tonumber(tempSection) or tempSection;
 			data[section] = data[section] or {};
 		end
-		local param, value = line:match('^([%w|_]+)%s-=%s-(.+)$');
+		--local param, value = line:match('^([%w|_]+)%s-=%s-(.+)$');
+		-- include keys with spaces
+		--local param, value = line:match("^([%w|_'.%s-]+)=%s-(.+)$");
+		-- read keys with no value
+		local param, value = line:match("^([%w|_'.%s-]+)=(.-)$");
 		if(param and value ~= nil)then
 			if(tonumber(value))then
 				value = tonumber(value);
@@ -53,6 +57,8 @@ function LIP.load(fileName)
 				param = tonumber(param);
 			end
 			data[section][param] = value;
+		elseif param and initNilValues then
+			data[section][param] = 0
 		end
 	end
 	file:close();
