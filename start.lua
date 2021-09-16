@@ -3,7 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
-local version = '0.4'
+local version = '0.4.1'
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -47,7 +47,7 @@ local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, I
 local LEMONS_INFO_INI = 'Lemons_Info.ini'
 local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
 
-local lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
+local lemons_info = {}
 local DEBUG = {all=false,dps=false,heal=false,buff=false,cast=false,combat=false,move=false,mez=false,pet=false,pull=false,chain=false,target=false}
 local debugCaptureTime = '60'
 
@@ -789,12 +789,14 @@ local function DrawListsTab()
             ImGui.TableSetupColumn('Mob or Zone Short Name',     0,   -1.0, 1)
             ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
             ImGui.TableHeadersRow()
-            for key,_ in pairs(lemons_info[selectedSharedList]) do
-                ImGui.TableNextRow()
-                ImGui.TableNextColumn()
-                local sel = ImGui.Selectable(key, selectedSharedListItem == key)
-                if sel then
-                    selectedSharedListItem = key
+            if lemons_info[selectedSharedList] then
+                for key,_ in pairs(lemons_info[selectedSharedList]) do
+                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
+                    local sel = ImGui.Selectable(key, selectedSharedListItem == key)
+                    if sel then
+                        selectedSharedListItem = key
+                    end
                 end
             end
             ImGui.EndTable()
@@ -977,6 +979,9 @@ if INIFile then
 else
     INIFile = string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
     config = {}
+end
+if FileExists(mq.configDir..'/'..LEMONS_INFO_INI) then
+    lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
 end
 
 local initCo = coroutine.create(function()
