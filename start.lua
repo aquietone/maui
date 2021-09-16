@@ -14,27 +14,42 @@ animBlueWndPieces:SetTextureCell(1)
 local animYellowWndPieces = mq.FindTextureAnimation('YellowIconBackground')
 animYellowWndPieces:SetTextureCell(1)
 
+-- UI State
 local open = true
 local shouldDrawUI = true
 local terminate = false
--- Some sections (just buffs atm) have more than 1 list property. Using a single 'selected'
+local initialRun = true
+local leftPanelDefaultWidth = 150
+local leftPanelWidth = 150
+-- Some sections have more than 1 list property. Using a single 'selectedListItem'
 -- value for the selected list item would interfere when multiple lists are displayed.
--- So, set individual selected items for up to 5 list properties in a section.
-local selected = {0,0,0,0,0}
+-- So, set individual selected items for list properties in a section.
+local selectedListItem = {0,0}
 local selectedUpgrade = {}
+local selectedSection = 'General' -- Left hand menu selected item
+local selectedDebug = 'all' -- debug dropdown menu selection
+local selectedSharedList = nil -- shared lists table selected list
+local selectedSharedListItem = nil -- shared lists list table selected entry
 
 local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
-local INIFile = nil
-local INIFileContents = nil
-local config = nil
+local INIFile = nil -- file name of character INI to load
+local INIFileContents = nil -- raw file contents for raw INI tab
+local config = nil -- lua table version of INI content
 local myServer = mq.TLO.EverQuest.Server()
 local myName = mq.TLO.Me.CleanName()
 local myLevel = mq.TLO.Me.Level()
 local myClass = mq.TLO.Me.Class.ShortName():lower()
 
 -- Storage for spell/AA/disc picker
-local spellIter, aaIter, discIter = 1,1,1
 local spells, altAbilities, discs = {categories={}},{},{}
+
+local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
+local LEMONS_INFO_INI = 'Lemons_Info.ini'
+local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
+
+local lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
+local DEBUG = {all=false,dps=false,heal=false,buff=false,cast=false,combat=false,move=false,mez=false,pet=false,pull=false,chain=false,target=false}
+local debugCaptureTime = '60'
 
 -- Helper functions
 local function Split(input, sep, limit, bRegexp)
@@ -192,6 +207,7 @@ end
 local function InitDiscTree()
     -- Build disc tree for picking discs
     -- TODO: split up by timers? haven't really looked at discs yet
+    local discIter = 1
     repeat
         local name = mq.TLO.Me.CombatAbility(discIter).Name():gsub(' Rk%..*', '')
         table.insert(discs, name)
@@ -333,7 +349,7 @@ local function DrawSpellPicker(sectionName, key, index, selectedIdx)
             end
         end
         -- Top level 'AAs' menu item
-        if #altAbilities > 0 then
+        if sectionName ~= 'MySpells' and #altAbilities > 0 then
             local menuHeight = -1
             if #altAbilities > 25 then
                 menuHeight = ImGui.GetTextLineHeight()*25
@@ -349,7 +365,7 @@ local function DrawSpellPicker(sectionName, key, index, selectedIdx)
             end
         end
         -- Top level 'Discs' menu item
-        if #discs > 0 then
+        if sectionName ~= 'MySpells' and #discs > 0 then
             local menuHeight = -1
             if #discs > 25 then
                 menuHeight = ImGui.GetTextLineHeight()*25
@@ -384,6 +400,7 @@ local function DrawSelectedSpellUpgradeButton(spell, selectedIdx)
             upgradeValue = selectedUpgrade[selectedIdx]
             selectedUpgrade[selectedIdx] = nil
         end
+        ImGui.SameLine()
     end
     return upgradeValue
 end
@@ -400,7 +417,7 @@ end
 
 -- Draw the value and condition of the selected list item
 local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
-    local valueKey = key..selected[selectedIdx]
+    local valueKey = key..selectedListItem[selectedIdx]
     -- make sure values not nil so imgui inputs don't barf
     if config[sectionName][valueKey] == nil then
         config[sectionName][valueKey] = 'NULL'
@@ -414,14 +431,14 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
 
     ImGui.Separator()
     ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 1, 1)
-    ImGui.Text(string.format('%s%d', key, selected[selectedIdx]))
+    ImGui.Text(string.format('%s%d', key, selectedListItem[selectedIdx]))
     ImGui.PopStyleColor()
     valueParts[1] = DrawKeyAndInputText('Name: ', '##'..sectionName..valueKey, valueParts[1])
     -- prevent | in the ability name field, or else things get ugly in the options field
     if valueParts[1]:find('|') then valueParts[1] = valueParts[1]:match('[^|]+') end
     valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2])
     if value['Conditions'] then
-        local valueCondKey = key..'Cond'..selected[selectedIdx]
+        local valueCondKey = key..'Cond'..selectedListItem[selectedIdx]
         if config[sectionName][valueCondKey] == nil then
             config[sectionName][valueCondKey] = 'NULL'
         end
@@ -431,6 +448,9 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     if mq.TLO.Me.Book(spell.RankName())() then
         local upgradeResult = DrawSelectedSpellUpgradeButton(spell, selectedIdx)
         if upgradeResult then valueParts[1] = upgradeResult end
+        if ImGui.SmallButton('Save to Gem') then
+
+        end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
         config[sectionName][valueKey] = valueParts[1]
@@ -447,7 +467,7 @@ local function DrawPlainListButton(sectionName, key, listIdx, selectedIdx, iconS
     -- INI value is set to non-spell/item
     if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
         if selectedIdx >= 0 then
-            selected[selectedIdx] = listIdx
+            selectedListItem[selectedIdx] = listIdx
             selectedUpgrade[selectedIdx] = nil
         end
     end
@@ -468,7 +488,7 @@ local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
     local iconSize = {30,30} -- default icon size
     if type(index) == 'number' then
         local x,y = ImGui.GetCursorPos()
-        if index == selected[selectedIdx] then
+        if index == selectedListItem[selectedIdx] then
             ImGui.DrawTextureAnimation(animYellowWndPieces, iconSize[1], iconSize[2])
             -- Icon inside the frame is 26x26. Need to overlay it on top of the frame, offset by 2x2
             ImGui.SetCursorPosX(x+2)
@@ -498,7 +518,7 @@ local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
         -- Handle clicks on spell icon animations that aren't buttons
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
             if selectedIdx >= 0 then 
-                selected[selectedIdx] = index
+                selectedListItem[selectedIdx] = index
                 selectedUpgrade[selectedIdx] = nil
             end
         end
@@ -529,8 +549,8 @@ local function DrawList(sectionName, key, value, selectedIdx)
     elseif config[sectionName][key..'Size'] > value['Max'] then
         config[sectionName][key..'Size'] = value['Max']
     end
-    if config[sectionName][key..'Size'] < selected[selectedIdx] then
-        selected[selectedIdx] = 0
+    if config[sectionName][key..'Size'] < selectedListItem[selectedIdx] then
+        selectedListItem[selectedIdx] = 0
         selectedUpgrade[selectedIdx] = nil
     end
     ImGui.PopItemWidth()
@@ -546,7 +566,7 @@ local function DrawList(sectionName, key, value, selectedIdx)
             ImGui.SameLine()
         end
     end
-    if selected[selectedIdx] > 0 then
+    if selectedListItem[selectedIdx] > 0 then
         DrawSelectedListItem(sectionName, key, value, selectedIdx)
     end
 end
@@ -644,6 +664,36 @@ local function DrawSectionControlSwitches(sectionName, sectionProperties)
     ImGui.Separator()
 end
 
+local function DrawMySpellsGemList()
+    local _,yOffset = ImGui.GetCursorPos()
+    local avail = ImGui.GetContentRegionAvail()
+    local iconsPerRow = math.floor(avail/36)
+    if iconsPerRow == 0 then iconsPerRow = 1 end
+    for i=1,13 do
+        local offsetMod = math.floor((i-1)/iconsPerRow)
+        ImGui.SetCursorPosY(yOffset+(34*offsetMod))
+        DrawSpellIconOrButton('MySpells', 'Gem', i, 1)
+        if i%iconsPerRow ~= 0 and i < 13 then
+            ImGui.SameLine()
+        end
+    end
+end
+
+local function DrawMySpells()
+    ImGui.TextColored(1, 1, 0, 1, 'MySpells:')
+    if config['MySpells'] then
+        DrawMySpellsGemList()
+    end
+    if ImGui.Button('Update from spell bar') then
+        if not config['MySpells'] then config['MySpells'] = {} end
+        for i=1,13 do
+            config['MySpells']['Gem'..i] = mq.TLO.Me.Gem(i).Name()
+        end
+        Save()
+        INIFileContents = ReadRawINIFile()
+    end
+end
+
 -- Draw an INI section tab
 local function DrawSection(sectionName, sectionProperties)
     if not config[sectionName] then
@@ -652,17 +702,6 @@ local function DrawSection(sectionName, sectionProperties)
     -- Draw main section control switches first
     if sectionProperties['Controls'] then
         DrawSectionControlSwitches(sectionName, sectionProperties['Controls'])
-    end
-    -- special case for SpellSet tab to draw save spell set button
-    if sectionName == 'SpellSet' then
-        if ImGui.Button('Save Spell Set') then
-            if not config['MySpells'] then config['MySpells'] = {} end
-            for i=1,13 do
-                config['MySpells']['Gem'..i] = mq.TLO.Me.Gem(i).Name()
-            end
-            Save()
-            INIFileContents = ReadRawINIFile()
-        end
     end
     if ImGui.BeginChild('SectionProperties') then
         -- Draw List properties before general properties
@@ -678,6 +717,10 @@ local function DrawSection(sectionName, sectionProperties)
             if value['Type'] ~= 'LIST' then
                 DrawProperty(sectionName, key, value)
             end
+        end
+        if sectionName == 'SpellSet' then
+            -- special case for SpellSet tab to draw save spell set button
+            DrawMySpells()
         end
     end
     ImGui.EndChild()
@@ -703,21 +746,16 @@ local function DrawRawINIEditTab()
     INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
 end
 
-local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
-local LEMONS_INFO_INI = 'Lemons_Info.ini'
-local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
-local selectedList = nil
-local selectedListItem = nil
-local lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
 local function DrawListsTab()
+    ImGui.Text("Not fully implemented yet. The buttons don't function and Lemons_Info.ini is only read once at startup.")
     ImGui.Text('Select a list below to edit:')
     ImGui.SameLine()
     if ImGui.SmallButton('Save Lemons INI') then
-
+        print('Save Lemons INI: not implemented')
     end
     ImGui.SameLine()
     if ImGui.SmallButton('Reload Lemons INI') then
-        
+        print('Reload Lemons INI: not implemented')
     end
     if ImGui.BeginTable('ListSelectionTable', 1, TABLE_FLAGS, 0, 150, 0.0) then
         ImGui.TableSetupColumn('List Name',     0,   -1.0, 1)
@@ -731,36 +769,36 @@ local function DrawListsTab()
                 ImGui.PushID(clipName)
                 ImGui.TableNextRow()
                 ImGui.TableNextColumn()
-                local sel = ImGui.Selectable(clipName, selectedList == clipName)
+                local sel = ImGui.Selectable(clipName, selectedSharedList == clipName)
                 if sel then
-                    selectedList = clipName
+                    selectedSharedList = clipName
                 end
                 ImGui.PopID()
             end
         end
         ImGui.EndTable()
     end
-    if selectedList ~= nil then
-        ImGui.TextColored(1, 1, 0, 1, selectedList)
+    if selectedSharedList ~= nil then
+        ImGui.TextColored(1, 1, 0, 1, selectedSharedList)
         ImGui.SameLine()
         ImGui.SetCursorPosX(100)
         if ImGui.SmallButton('Add Entry') then
-
+            print('Add Entry: not implemented')
         end
         ImGui.SameLine()
         if ImGui.SmallButton('Remove Selected') then
-
+            print('Remove Selected: not implemented')
         end
         if ImGui.BeginTable('SelectedListTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
             ImGui.TableSetupColumn('Mob or Zone Short Name',     0,   -1.0, 1)
             ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
             ImGui.TableHeadersRow()
-            for key,_ in pairs(lemons_info[selectedList]) do
+            for key,_ in pairs(lemons_info[selectedSharedList]) do
                 ImGui.TableNextRow()
                 ImGui.TableNextColumn()
-                local sel = ImGui.Selectable(key, selectedListItem == key)
+                local sel = ImGui.Selectable(key, selectedSharedListItem == key)
                 if sel then
-                    selectedListItem = key
+                    selectedSharedListItem = key
                 end
             end
             ImGui.EndTable()
@@ -768,29 +806,29 @@ local function DrawListsTab()
     end
 end
 
-local selectedDebug = 'dps'
-local DEBUG = {'dps','heals','buffs'}
-local debugCaptureTime = '60'
 local function DrawDebugTab()
-    ImGui.Text('Not implemented')
-    if ImGui.BeginCombo('Debug Categories', selectedDebug) then
-        for i,j in ipairs(DEBUG) do
-            if ImGui.Selectable(j, selectedDebug == j) then
-                selectedDebug = j
-            end
+    local debuginput = ''
+    for i,j in pairs(DEBUG) do
+        if j then debuginput = debuginput..i end
+    end
+    if ImGui.BeginCombo('Debug Categories', debuginput) then
+        for i,j in pairs(DEBUG) do
+            DEBUG[i] = ImGui.Checkbox(i, j)
         end
         ImGui.EndCombo()
     end
     debugCaptureTime = ImGui.InputText('Debug Capture Time', debugCaptureTime)
     if selectedDebug then
-        if ImGui.Button('Debug '..selectedDebug) then
-            mq.cmdf('/writedebug %s %s', selectedDebug, debugCaptureTime)
+        if ImGui.Button('Enable Debug') then
+            debuginput = ''
+            for i,j in pairs(DEBUG) do
+                if j then debuginput = debuginput..i end
+            end
+            mq.cmdf('/writedebug %s %s', debuginput, debugCaptureTime)
         end
     end
 end
 
-local basepanesize = 150
-local lpanesize = 150
 local function DrawSplitter(thickness, size0, min_size0)
     local x,y = ImGui.GetCursorPos()
     local delta = 0
@@ -815,19 +853,19 @@ local function DrawSplitter(thickness, size0, min_size0)
         end
 
         size0 = size0 + delta
-        lpanesize = size0
+        leftPanelWidth = size0
     else
-        basepanesize = lpanesize
+        leftPanelDefaultWidth = leftPanelWidth
     end
     ImGui.SetCursorPosX(x)
     ImGui.SetCursorPosY(y)
 end
 
+-- Define this down here since the functions need to be defined first
 local customSections = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab}
-local selectedSection = 'General'
 local function LeftPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
-    if ImGui.BeginChild("left", lpanesize, y-1, true) then
+    if ImGui.BeginChild("left", leftPanelWidth, y-1, true) then
         if ImGui.BeginTable('SelectSectionTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
             ImGui.TableSetupColumn('Section Name',     0,   -1.0, 1)
             ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
@@ -848,7 +886,7 @@ local function LeftPaneWindow()
                     end
                     local sel = ImGui.Selectable(sectionName, selectedSection == sectionName)
                     if sel and selectedSection ~= sectionName then
-                        selected = {0,0,0,0,0}
+                        selectedListItem = {0,0}
                         selectedSection = sectionName
                     end
                     if popStyleColor then ImGui.PopStyleColor() end
@@ -882,7 +920,7 @@ local function RightPaneWindow()
 end
 
 local function DrawWindowPanels()
-    DrawSplitter(8, basepanesize, 75)
+    DrawSplitter(8, leftPanelDefaultWidth, 75)
     ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
     LeftPaneWindow()
     ImGui.SameLine()
@@ -918,13 +956,14 @@ local function DrawWindowHeaderSettings()
     ImGui.Separator()
 end
 
-local initialRun = true
 local MAUI = function()
     open, shouldDrawUI = ImGui.Begin('MuleAssist UI (v'..version..')###MuleAssist', open)
     if shouldDrawUI then
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
-        if initialRun and ImGui.GetWindowHeight() == 102 and ImGui.GetWindowWidth() == 623 then
-            ImGui.SetWindowSize(727,487)
+        if initialRun then
+            if ImGui.GetWindowHeight() == 38 and ImGui.GetWindowWidth() == 32 then
+                ImGui.SetWindowSize(727,487)
+            end
             initialRun = false
         end
         DrawWindowHeaderSettings()
