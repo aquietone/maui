@@ -400,7 +400,6 @@ local function DrawSelectedSpellUpgradeButton(spell, selectedIdx)
             upgradeValue = selectedUpgrade[selectedIdx]
             selectedUpgrade[selectedIdx] = nil
         end
-        ImGui.SameLine()
     end
     return upgradeValue
 end
@@ -448,9 +447,6 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     if mq.TLO.Me.Book(spell.RankName())() then
         local upgradeResult = DrawSelectedSpellUpgradeButton(spell, selectedIdx)
         if upgradeResult then valueParts[1] = upgradeResult end
-        if ImGui.SmallButton('Save to Gem') then
-
-        end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
         config[sectionName][valueKey] = valueParts[1]
