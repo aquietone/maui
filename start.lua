@@ -3,7 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
-local version = '0.4.1'
+local version = '0.5'
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -13,6 +13,8 @@ local animBlueWndPieces = mq.FindTextureAnimation('BlueIconBackground')
 animBlueWndPieces:SetTextureCell(1)
 local animYellowWndPieces = mq.FindTextureAnimation('YellowIconBackground')
 animYellowWndPieces:SetTextureCell(1)
+local animRedWndPieces = mq.FindTextureAnimation('RedIconBackground')
+animRedWndPieces:SetTextureCell(1)
 
 -- UI State
 local open = true
@@ -21,16 +23,16 @@ local terminate = false
 local initialRun = true
 local leftPanelDefaultWidth = 150
 local leftPanelWidth = 150
--- Some sections have more than 1 list property. Using a single 'selectedListItem'
--- value for the selected list item would interfere when multiple lists are displayed.
--- So, set individual selected items for list properties in a section.
-local selectedListItem = {0,0}
-local selectedUpgrade = {}
+
+local selectedListItem = {nil, 0} -- {key, index}
+local selectedUpgrade = nil
 local selectedSection = 'General' -- Left hand menu selected item
 local selectedDebug = 'all' -- debug dropdown menu selection
 local selectedSharedList = nil -- shared lists table selected list
 local selectedSharedListItem = nil -- shared lists list table selected entry
 
+local MA_INI_LVL_PATTERN = 'MuleAssist_%s_%s_%d.ini'
+local MA_INI_NOLVL_PATTERN = 'MuleAssist_%s_%s.ini'
 local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
 local INIFile = nil -- file name of character INI to load
 local INIFileContents = nil -- raw file contents for raw INI tab
@@ -44,7 +46,7 @@ local myClass = mq.TLO.Me.Class.ShortName():lower()
 local spells, altAbilities, discs = {categories={}},{},{}
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
-local LEMONS_INFO_INI = 'Lemons_Info.ini'
+local LEMONS_INFO_INI = mq.configDir..'/Lemons_Info.ini'
 local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
 
 local lemons_info = {}
@@ -77,14 +79,6 @@ local function Split(input, sep, limit, bRegexp)
     return aRecord
 end
 
-local function JoinStrings(t, sep, start)
-    local result = t[start]
-    for i=start+1,#t do
-        result = result..'|'..t[i]
-    end
-    return result
-end
-
 local function ReadRawINIFile()
     local f = io.open(mq.configDir..'/'..INIFile, 'r')
     local contents = f:read('*a')
@@ -103,16 +97,28 @@ local function FileExists(path)
     if f ~= nil then io.close(f) return true else return false end
 end
 
+local function CopyFile(source, dest)
+    local f = io.open(source, 'r')
+    local contents = f:read('*a')
+    io.close(f)
+    f = io.open(dest, 'w')
+    f:write(contents)
+    io.close(f)
+end
+
 local function FindINIFileName()
-    if FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)) then
-        return string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
-    elseif FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s.ini', myServer, myName)) then
-        return string.format('MuleAssist_%s_%s.ini', myServer, myName)
+    if FileExists(mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)) then
+        return MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+    elseif FileExists(mq.configDir..'/'..MA_INI_NOLVL_PATTERN:format(myServer, myName)) then
+        return MA_INI_NOLVL_PATTERN:format(myServer, myName)
     else
         local fileLevel = myLevel-1
         repeat
-            if FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, fileLevel)) then
-                return string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, fileLevel)
+            local fileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
+            if FileExists(fileName) then
+                local targetFileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+                CopyFile(fileName, targetFileName)
+                return MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
             end
             fileLevel = fileLevel-1
         until fileLevel == myLevel-10
@@ -314,7 +320,7 @@ end
 -- Recreate the spell bar context menu
 -- sectionName+key+index defines where to store the result
 -- selectedIdx is used to clear spell upgrade input incase of updating over an existing entry
-local function DrawSpellPicker(sectionName, key, index, selectedIdx)
+local function DrawSpellPicker(sectionName, key, index)
     if not config[sectionName][key..index] then
         config[sectionName][key..index] = ''
     end
@@ -335,7 +341,7 @@ local function DrawSpellPicker(sectionName, key, index, selectedIdx)
                                     SetSpellTextColor(spell)
                                     if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
                                         valueParts[1] = spell
-                                        selectedUpgrade[selectedIdx] = nil
+                                        selectedUpgrade = nil
                                     end
                                     ImGui.PopStyleColor()
                                 end
@@ -388,17 +394,17 @@ local function DrawSpellPicker(sectionName, key, index, selectedIdx)
     end
 end
 
-local function DrawSelectedSpellUpgradeButton(spell, selectedIdx)
+local function DrawSelectedSpellUpgradeButton(spell)
     local upgradeValue = nil
     -- Avoid finding the upgrade more than once
-    if not selectedUpgrade[selectedIdx] then
-        selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
+    if not selectedUpgrade then
+        selectedUpgrade = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
     end
     -- Upgrade found? display the upgrade button
-    if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
-        if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
-            upgradeValue = selectedUpgrade[selectedIdx]
-            selectedUpgrade[selectedIdx] = nil
+    if selectedUpgrade ~= '' and selectedUpgrade ~= spell.Name() then
+        if ImGui.Button('Upgrade Available - '..selectedUpgrade) then
+            upgradeValue = selectedUpgrade
+            selectedUpgrade = nil
         end
     end
     return upgradeValue
@@ -415,8 +421,8 @@ local function DrawKeyAndInputText(keyText, label, value)
 end
 
 -- Draw the value and condition of the selected list item
-local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
-    local valueKey = key..selectedListItem[selectedIdx]
+local function DrawSelectedListItem(sectionName, key, value)
+    local valueKey = key..selectedListItem[2]
     -- make sure values not nil so imgui inputs don't barf
     if config[sectionName][valueKey] == nil then
         config[sectionName][valueKey] = 'NULL'
@@ -430,14 +436,14 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
 
     ImGui.Separator()
     ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 1, 1)
-    ImGui.Text(string.format('%s%d', key, selectedListItem[selectedIdx]))
+    ImGui.Text(string.format('%s%d', key, selectedListItem[2]))
     ImGui.PopStyleColor()
     valueParts[1] = DrawKeyAndInputText('Name: ', '##'..sectionName..valueKey, valueParts[1])
     -- prevent | in the ability name field, or else things get ugly in the options field
     if valueParts[1]:find('|') then valueParts[1] = valueParts[1]:match('[^|]+') end
     valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2])
     if value['Conditions'] then
-        local valueCondKey = key..'Cond'..selectedListItem[selectedIdx]
+        local valueCondKey = key..'Cond'..selectedListItem[2]
         if config[sectionName][valueCondKey] == nil then
             config[sectionName][valueCondKey] = 'NULL'
         end
@@ -445,7 +451,7 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     end
     local spell = mq.TLO.Spell(valueParts[1])
     if mq.TLO.Me.Book(spell.RankName())() then
-        local upgradeResult = DrawSelectedSpellUpgradeButton(spell, selectedIdx)
+        local upgradeResult = DrawSelectedSpellUpgradeButton(spell)
         if upgradeResult then valueParts[1] = upgradeResult end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
@@ -459,13 +465,11 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     ImGui.Separator()
 end
 
-local function DrawPlainListButton(sectionName, key, listIdx, selectedIdx, iconSize)
+local function DrawPlainListButton(sectionName, key, listIdx, iconSize)
     -- INI value is set to non-spell/item
-    if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
-        if selectedIdx >= 0 then
-            selectedListItem[selectedIdx] = listIdx
-            selectedUpgrade[selectedIdx] = nil
-        end
+    if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) and type(listIdx) == 'number' then
+        selectedListItem = {key, listIdx}
+        selectedUpgrade = nil
     end
 end
 
@@ -479,56 +483,73 @@ local function DrawTooltip(text)
     end
 end
 
-local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
-    local iniValue = config[sectionName][key..index]
+local function ValidSpellOrItem(iniValue)
+    local valid = false
+    if not iniValue then
+        -- count unset INI entry as valid
+        valid = true
+    else
+        if mq.TLO.Spell(iniValue)() then
+            if mq.TLO.Me.Book(mq.TLO.Spell(iniValue).RankName())() then
+                valid = true
+            elseif mq.TLO.Me.AltAbility(iniValue)() then
+                valid = true
+            elseif mq.TLO.Me.CombatAbility(iniValue)() then
+                valid = true
+            end
+        elseif mq.TLO.FindItem(iniValue)() then
+            valid = true
+        end
+    end
+    return valid
+end
+
+local function DrawSpellIconOrButton(sectionName, key, index)
+    local iniValue = nil
+    if config[sectionName][key..index] and config[sectionName][key..index] ~= 'NULL' then
+        iniValue = Split(config[sectionName][key..index],'|',1)[1]
+    end
+    local charHasAbility = ValidSpellOrItem(iniValue)
     local iconSize = {30,30} -- default icon size
     if type(index) == 'number' then
         local x,y = ImGui.GetCursorPos()
-        if index == selectedListItem[selectedIdx] then
-            ImGui.DrawTextureAnimation(animYellowWndPieces, iconSize[1], iconSize[2])
-            -- Icon inside the frame is 26x26. Need to overlay it on top of the frame, offset by 2x2
+        if not charHasAbility then
+            ImGui.DrawTextureAnimation(animRedWndPieces, iconSize[1], iconSize[2])
             ImGui.SetCursorPosX(x+2)
             ImGui.SetCursorPosY(y+2)
-        else
-            ImGui.DrawTextureAnimation(animBlueWndPieces, iconSize[1], iconSize[2])
-            ImGui.SetCursorPosX(x+2)
-            ImGui.SetCursorPosY(y+2)
+            iconSize = {26,26}
         end
-        iconSize = {26,26}
     end
-    if iniValue and iniValue ~= 'NULL' then
-        local iniValueParts = Split(iniValue,'|',1)
+    if iniValue then
         -- Use first part of INI value as spell or item name to lookup icon
-        if mq.TLO.Spell(iniValueParts[1])() then
-            local spellIcon = mq.TLO.Spell(iniValueParts[1]).SpellIcon()
+        if mq.TLO.Spell(iniValue)() then
+            local spellIcon = mq.TLO.Spell(iniValue).SpellIcon()
             animSpellIcons:SetTextureCell(spellIcon)
             ImGui.DrawTextureAnimation(animSpellIcons, iconSize[1], iconSize[2])
-        elseif mq.TLO.FindItem(iniValueParts[1])() then
-            local itemIcon = mq.TLO.FindItem(iniValueParts[1]).Icon()
+        elseif mq.TLO.FindItem(iniValue)() then
+            local itemIcon = mq.TLO.FindItem(iniValue).Icon()
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, iconSize[1], iconSize[2])
         else
-            DrawPlainListButton(sectionName, key, index, selectedIdx, iconSize)
+            DrawPlainListButton(sectionName, key, index, iconSize)
         end
-        DrawTooltip(iniValueParts[1])
+        DrawTooltip(iniValue)
         -- Handle clicks on spell icon animations that aren't buttons
-        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            if selectedIdx >= 0 then 
-                selectedListItem[selectedIdx] = index
-                selectedUpgrade[selectedIdx] = nil
-            end
+        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
+            selectedListItem = {key, index}
+            selectedUpgrade = nil
         end
         -- Spell picker context menu on right click button
-        DrawSpellPicker(sectionName, key, index, selectedIdx)
+        DrawSpellPicker(sectionName, key, index)
     else
         -- No INI value assigned yet for this key
-        DrawPlainListButton(sectionName, key, index, selectedIdx, iconSize)
-        DrawSpellPicker(sectionName, key, index, selectedIdx)
+        DrawPlainListButton(sectionName, key, index, iconSize)
+        DrawSpellPicker(sectionName, key, index)
     end
 end
 
 -- Draw 0..N buttons based on value of XYZSize input
-local function DrawList(sectionName, key, value, selectedIdx)
+local function DrawList(sectionName, key, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..'Size: ')
     ImGui.PopStyleColor()
@@ -545,25 +566,18 @@ local function DrawList(sectionName, key, value, selectedIdx)
     elseif config[sectionName][key..'Size'] > value['Max'] then
         config[sectionName][key..'Size'] = value['Max']
     end
-    if config[sectionName][key..'Size'] < selectedListItem[selectedIdx] then
-        selectedListItem[selectedIdx] = 0
-        selectedUpgrade[selectedIdx] = nil
-    end
     ImGui.PopItemWidth()
     local _,yOffset = ImGui.GetCursorPos()
     local avail = ImGui.GetContentRegionAvail()
-    local iconsPerRow = math.floor(avail/36)
+    local iconsPerRow = math.floor(avail/38)
     if iconsPerRow == 0 then iconsPerRow = 1 end
     for i=1,config[sectionName][key..'Size'] do
         local offsetMod = math.floor((i-1)/iconsPerRow)
         ImGui.SetCursorPosY(yOffset+(34*offsetMod))
-        DrawSpellIconOrButton(sectionName, key, i, selectedIdx)
+        DrawSpellIconOrButton(sectionName, key, i)
         if i%iconsPerRow ~= 0 and i < config[sectionName][key..'Size'] then
             ImGui.SameLine()
         end
-    end
-    if selectedListItem[selectedIdx] > 0 then
-        DrawSelectedListItem(sectionName, key, value, selectedIdx)
     end
 end
 
@@ -611,7 +625,7 @@ local function DrawProperty(sectionName, key, value)
     if value['Type'] == 'SWITCH' then
         config[sectionName][key] = ImGui.Checkbox('##'..key, InitCheckBoxValue(config[sectionName][key]))
     elseif value['Type'] == 'SPELL' then
-        DrawSpellIconOrButton(sectionName, key, '', -1)
+        DrawSpellIconOrButton(sectionName, key, '')
         ImGui.SameLine()
         ImGui.PushItemWidth(350)
         config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, config[sectionName][key])
@@ -668,7 +682,7 @@ local function DrawMySpellsGemList()
     for i=1,13 do
         local offsetMod = math.floor((i-1)/iconsPerRow)
         ImGui.SetCursorPosY(yOffset+(34*offsetMod))
-        DrawSpellIconOrButton('MySpells', 'Gem', i, 1)
+        DrawSpellIconOrButton('MySpells', 'Gem', i)
         if i%iconsPerRow ~= 0 and i < 13 then
             ImGui.SameLine()
         end
@@ -700,23 +714,32 @@ local function DrawSection(sectionName, sectionProperties)
         DrawSectionControlSwitches(sectionName, sectionProperties['Controls'])
     end
     if ImGui.BeginChild('SectionProperties') then
-        -- Draw List properties before general properties
-        local listIdx = 1
-        for key,value in pairs(sectionProperties['Properties']) do
-            if value['Type'] == 'LIST' then
-                DrawList(sectionName, key, value, listIdx)
-                listIdx = listIdx + 1
-            end
-        end
-        -- Generic properties last
-        for key,value in pairs(sectionProperties['Properties']) do
-            if value['Type'] ~= 'LIST' then
-                DrawProperty(sectionName, key, value)
-            end
-        end
         if sectionName == 'SpellSet' then
             -- special case for SpellSet tab to draw save spell set button
             DrawMySpells()
+        else
+            if selectedListItem[1] then
+                if ImGui.Button('Back to List') then
+                    selectedListItem = {nil, 0}
+                    selectedUpgrade = nil
+                else
+                    DrawSpellIconOrButton(sectionName, selectedListItem[1], selectedListItem[2])
+                    DrawSelectedListItem(sectionName, selectedListItem[1], sectionProperties['Properties'][selectedListItem[1]])
+                end
+            else
+                -- Draw List properties before general properties
+                for key,value in pairs(sectionProperties['Properties']) do
+                    if value['Type'] == 'LIST' then
+                        DrawList(sectionName, key, value)
+                    end
+                end
+                -- Generic properties last
+                for key,value in pairs(sectionProperties['Properties']) do
+                    if value['Type'] ~= 'LIST' then
+                        DrawProperty(sectionName, key, value)
+                    end
+                end
+            end
         end
     end
     ImGui.EndChild()
@@ -743,15 +766,19 @@ local function DrawRawINIEditTab()
 end
 
 local function DrawListsTab()
-    ImGui.Text("Not fully implemented yet. The buttons don't function and Lemons_Info.ini is only read once at startup.")
+    ImGui.PushTextWrapPos(ImGui.GetContentRegionAvail()-10)
+    ImGui.TextColored(0, 1, 1, 1, "View shared list content from Lemons_Info.ini. To add entries, use the macro /addxyz commands and click reload.")
+    ImGui.PopTextWrapPos()
     ImGui.Text('Select a list below to edit:')
     ImGui.SameLine()
     if ImGui.SmallButton('Save Lemons INI') then
-        print('Save Lemons INI: not implemented')
+        LIP.save(LEMONS_INFO_INI, lemons_info)
     end
     ImGui.SameLine()
     if ImGui.SmallButton('Reload Lemons INI') then
-        print('Reload Lemons INI: not implemented')
+        if FileExists(LEMONS_INFO_INI) then
+            lemons_info = LIP.load(LEMONS_INFO_INI, true)
+        end
     end
     if ImGui.BeginTable('ListSelectionTable', 1, TABLE_FLAGS, 0, 150, 0.0) then
         ImGui.TableSetupColumn('List Name',     0,   -1.0, 1)
@@ -778,12 +805,9 @@ local function DrawListsTab()
         ImGui.TextColored(1, 1, 0, 1, selectedSharedList)
         ImGui.SameLine()
         ImGui.SetCursorPosX(100)
-        if ImGui.SmallButton('Add Entry') then
-            print('Add Entry: not implemented')
-        end
         ImGui.SameLine()
         if ImGui.SmallButton('Remove Selected') then
-            print('Remove Selected: not implemented')
+            lemons_info[selectedSharedList][selectedSharedListItem] = nil
         end
         if ImGui.BeginTable('SelectedListTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
             ImGui.TableSetupColumn('Mob or Zone Short Name',     0,   -1.0, 1)
@@ -884,7 +908,7 @@ local function LeftPaneWindow()
                     end
                     local sel = ImGui.Selectable(sectionName, selectedSection == sectionName)
                     if sel and selectedSection ~= sectionName then
-                        selectedListItem = {0,0}
+                        selectedListItem = {nil,0}
                         selectedSection = sectionName
                     end
                     if popStyleColor then ImGui.PopStyleColor() end
@@ -977,11 +1001,11 @@ if INIFile then
     config = LIP.load(mq.configDir..'/'..INIFile)
     INIFileContents = ReadRawINIFile()
 else
-    INIFile = string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
+    INIFile = MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
     config = {}
 end
-if FileExists(mq.configDir..'/'..LEMONS_INFO_INI) then
-    lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
+if FileExists(LEMONS_INFO_INI) then
+    lemons_info = LIP.load(LEMONS_INFO_INI, true)
 end
 
 local initCo = coroutine.create(function()
