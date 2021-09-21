@@ -1,3 +1,15 @@
+0.5
+- Copy previous level INIs to current level if one is found (within 10 levels)
+- Selecting a list item like DPS1 will drill-down to an edit view for the selected item, rather than 
+  drawing the edit fields for the selected item in-line.
+  InputText fields don't seem to be very responsive if several textures are being drawn, like if the DPS tab
+  is showing 15 spells at once. The InputText fields can barely be typed in during that scenario.
+0.4.1
+- Bug fix for shared lists when Lemons_Info.ini does not exist
+0.4
+- Debug tab
+- MySpells under SpellSet
+- Shared Lists
 0.3
 - Swap tab bar for left hand side menu
 - Add Save Spell Set button under spell set settings
