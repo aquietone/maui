@@ -3,7 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
-local version = '0.5'
+local version = '0.5.1'
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -54,6 +54,10 @@ local DEBUG = {all=false,dps=false,heal=false,buff=false,cast=false,combat=false
 local debugCaptureTime = '60'
 
 -- Helper functions
+local function printf(...)
+    print(string.format(...))
+end
+
 local function Split(input, sep, limit, bRegexp)
     assert(sep ~= '')
     assert(limit == nil or limit >= 1)
@@ -114,11 +118,12 @@ local function FindINIFileName()
     else
         local fileLevel = myLevel-1
         repeat
-            local fileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
-            if FileExists(fileName) then
-                local targetFileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
-                CopyFile(fileName, targetFileName)
-                return MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+            local fileName = MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
+            if FileExists(mq.configDir..'/'..fileName) then
+                local targetFileName = MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+                CopyFile(mq.configDir..'/'..fileName, mq.configDir..'/'..targetFileName)
+                printf('Copying %s to %s', fileName, targetFileName)
+                return targetFileName
             end
             fileLevel = fileLevel-1
         until fileLevel == myLevel-10
@@ -410,6 +415,12 @@ local function DrawSelectedSpellUpgradeButton(spell)
     return upgradeValue
 end
 
+local function CheckInputType(key, value, typestring, inputtype)
+    if type(value) ~= typestring then
+        printf('\arWARNING [%s]: %s value is not a %s: type=%s value=%s\a-x', key, inputtype, typestring, type(value), tostring(value))
+    end
+end
+
 local function DrawKeyAndInputText(keyText, label, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(keyText)
@@ -417,6 +428,7 @@ local function DrawKeyAndInputText(keyText, label, value)
     ImGui.SameLine()
     ImGui.SetCursorPosX(175)
     -- the first part, spell/item/disc name, /command, etc
+    CheckInputType(label, value, 'string', 'InputText')
     return ImGui.InputText(label, value)
 end
 
@@ -555,30 +567,33 @@ local function DrawList(sectionName, key, value)
     ImGui.PopStyleColor()
     ImGui.SameLine()
     ImGui.PushItemWidth(100)
-    if config[sectionName][key..'Size'] == nil then
-        config[sectionName][key..'Size'] = 1
+    local size = config[sectionName][key..'Size']
+    if size == nil or type(size) ~= 'number' then
+        CheckInputType(key..'Size', size, 'number', 'InputInt')
+        size = 0
     end
     ImGui.SetCursorPosX(175)
     -- Set size of list and check boundaries
-    config[sectionName][key..'Size'] = ImGui.InputInt('##sizeinput'..sectionName..key, config[sectionName][key..'Size'])
-    if config[sectionName][key..'Size'] < 0 then
-        config[sectionName][key..'Size'] = 0
-    elseif config[sectionName][key..'Size'] > value['Max'] then
-        config[sectionName][key..'Size'] = value['Max']
+    size = ImGui.InputInt('##sizeinput'..sectionName..key, size)
+    if size < 0 then
+        size = 0
+    elseif size > value['Max'] then
+        size = value['Max']
     end
     ImGui.PopItemWidth()
     local _,yOffset = ImGui.GetCursorPos()
     local avail = ImGui.GetContentRegionAvail()
     local iconsPerRow = math.floor(avail/38)
     if iconsPerRow == 0 then iconsPerRow = 1 end
-    for i=1,config[sectionName][key..'Size'] do
+    for i=1,size do
         local offsetMod = math.floor((i-1)/iconsPerRow)
         ImGui.SetCursorPosY(yOffset+(34*offsetMod))
         DrawSpellIconOrButton(sectionName, key, i)
-        if i%iconsPerRow ~= 0 and i < config[sectionName][key..'Size'] then
+        if i%iconsPerRow ~= 0 and i < size then
             ImGui.SameLine()
         end
     end
+    config[sectionName][key..'Size'] = size
 end
 
 local function DrawMultiPartProperty(sectionName, key, value)
@@ -589,14 +604,18 @@ local function DrawMultiPartProperty(sectionName, key, value)
         if part['Type'] == 'SWITCH' then
             ImGui.Text(part['Name']..': ')
             ImGui.SameLine()
-            parts[partIdx] = ImGui.Checkbox('##'..key, InitCheckBoxValue(tonumber(parts[partIdx])))
+            local value = InitCheckBoxValue(tonumber(parts[partIdx]))
+            CheckInputType(key, value, 'boolean', 'Checkbox')
+            parts[partIdx] = ImGui.Checkbox('##'..key, value)
             if parts[partIdx] then parts[partIdx] = '1' else parts[partIdx] = '0' end
         elseif part['Type'] == 'NUMBER' then
             if not parts[partIdx] or parts[partIdx] == 'NULL' then parts[partIdx] = 0 end
             ImGui.Text(part['Name']..': ')
             ImGui.SameLine()
             ImGui.PushItemWidth(100)
-            parts[partIdx] = ImGui.InputInt('##'..sectionName..key..partIdx, tonumber(parts[partIdx]))
+            local value = tonumber(parts[partIdx])
+            CheckInputType(key, value, 'number', 'InputInt')
+            parts[partIdx] = ImGui.InputInt('##'..sectionName..key..partIdx, value)
             ImGui.PopItemWidth()
             if part['Min'] and parts[partIdx] < part['Min'] then
                 parts[partIdx] = part['Min']
@@ -623,17 +642,25 @@ local function DrawProperty(sectionName, key, value)
     end
     ImGui.SetCursorPosX(175)
     if value['Type'] == 'SWITCH' then
-        config[sectionName][key] = ImGui.Checkbox('##'..key, InitCheckBoxValue(config[sectionName][key]))
+        local initialValue = InitCheckBoxValue(config[sectionName][key])
+        CheckInputType(key, initialValue, 'boolean', 'Checkbox')
+        config[sectionName][key] = ImGui.Checkbox('##'..key, initialValue)
     elseif value['Type'] == 'SPELL' then
         DrawSpellIconOrButton(sectionName, key, '')
         ImGui.SameLine()
         ImGui.PushItemWidth(350)
-        config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, config[sectionName][key])
+        local initialValue = config[sectionName][key]
+        CheckInputType(key, initialValue, 'string', 'InputText')
+        config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
     elseif value['Type'] == 'NUMBER' then
-        if config[sectionName][key] == 'NULL' then config[sectionName][key] = 0 end
+        local initialValue = config[sectionName][key]
+        if not initialValue or initialValue == 'NULL' or type(initialValue) ~= 'number' then
+            CheckInputType(key, initialValue, 'number', 'InputInt')
+            initialValue = 0
+        end
         ImGui.PushItemWidth(350)
-        config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, config[sectionName][key])
+        config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
         if value['Min'] and config[sectionName][key] < value['Min'] then
             config[sectionName][key] = value['Min']
@@ -642,7 +669,9 @@ local function DrawProperty(sectionName, key, value)
         end
     elseif value['Type'] == 'STRING' then
         ImGui.PushItemWidth(350)
-        config[sectionName][key] = ImGui.InputText('##'..sectionName..key, tostring(config[sectionName][key]))
+        local initialValue = tostring(config[sectionName][key])
+        CheckInputType(key, initialValue, 'string', 'InputText')
+        config[sectionName][key] = ImGui.InputText('##'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
     elseif value['Type'] == 'MULTIPART' then
         DrawMultiPartProperty(sectionName, key, value)
@@ -653,7 +682,9 @@ end
 local function DrawSectionControlSwitches(sectionName, sectionProperties)
     if sectionProperties['On'] then
         if sectionProperties['On']['Type'] == 'SWITCH' then
-            config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', InitCheckBoxValue(config[sectionName][sectionName..'On']))
+            local value = InitCheckBoxValue(config[sectionName][sectionName..'On'])
+            CheckInputType(sectionName..'On', value, 'boolean', 'Checkbox')
+            config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', value)
         elseif sectionProperties['On']['Type'] == 'NUMBER' then
             -- Type=NUMBER control switch mostly a special case for DPS section only
             if not config[sectionName][sectionName..'On'] then config[sectionName][sectionName..'On'] = 0 end
