@@ -3,7 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
-local version = '0.5.1'
+local version = '0.5.3'
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -129,6 +129,17 @@ local function FindINIFileName()
         until fileLevel == myLevel-10
     end
     return nil
+end
+
+local function HelpMarker(desc)
+    ImGui.TextDisabled('(?)')
+    if ImGui.IsItemHovered() then
+        ImGui.BeginTooltip()
+        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
+        ImGui.Text(desc)
+        ImGui.PopTextWrapPos()
+        ImGui.EndTooltip()
+    end
 end
 
 -- convert INI 0/1 to true/false for ImGui checkboxes
@@ -421,10 +432,12 @@ local function CheckInputType(key, value, typestring, inputtype)
     end
 end
 
-local function DrawKeyAndInputText(keyText, label, value)
+local function DrawKeyAndInputText(keyText, label, value, helpText)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(keyText)
     ImGui.PopStyleColor()
+    ImGui.SameLine()
+    HelpMarker(helpText)
     ImGui.SameLine()
     ImGui.SetCursorPosX(175)
     -- the first part, spell/item/disc name, /command, etc
@@ -450,16 +463,16 @@ local function DrawSelectedListItem(sectionName, key, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 1, 1)
     ImGui.Text(string.format('%s%d', key, selectedListItem[2]))
     ImGui.PopStyleColor()
-    valueParts[1] = DrawKeyAndInputText('Name: ', '##'..sectionName..valueKey, valueParts[1])
+    valueParts[1] = DrawKeyAndInputText('Name: ', '##'..sectionName..valueKey, valueParts[1], value['Tooltip'])
     -- prevent | in the ability name field, or else things get ugly in the options field
     if valueParts[1]:find('|') then valueParts[1] = valueParts[1]:match('[^|]+') end
-    valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2])
+    valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2], value['OptionsTooltip'])
     if value['Conditions'] then
         local valueCondKey = key..'Cond'..selectedListItem[2]
         if config[sectionName][valueCondKey] == nil then
             config[sectionName][valueCondKey] = 'NULL'
         end
-        config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, config[sectionName][valueCondKey])
+        config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, config[sectionName][valueCondKey], value['CondTooltip'])
     end
     local spell = mq.TLO.Spell(valueParts[1])
     if mq.TLO.Me.Book(spell.RankName())() then
@@ -566,6 +579,8 @@ local function DrawList(sectionName, key, value)
     ImGui.Text(key..'Size: ')
     ImGui.PopStyleColor()
     ImGui.SameLine()
+    HelpMarker(value['SizeTooltip'])
+    ImGui.SameLine()
     ImGui.PushItemWidth(100)
     local size = config[sectionName][key..'Size']
     if size == nil or type(size) ~= 'number' then
@@ -636,6 +651,8 @@ local function DrawProperty(sectionName, key, value)
     ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
     ImGui.Text(key..': ')
     ImGui.PopStyleColor()
+    ImGui.SameLine()
+    HelpMarker(value['Tooltip'])
     ImGui.SameLine()
     if config[sectionName][key] == nil then
         config[sectionName][key] = 'NULL'
