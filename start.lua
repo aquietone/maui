@@ -1,7 +1,9 @@
+--- @type mq
 local mq = require 'mq'
+--- @type ImGui
 require 'ImGui'
 local LIP = require 'ma.LIP'
-local schema = require 'ma.schema'
+local schema = require 'ma.schemas.ma'
 
 local version = '0.5.3'
 
@@ -31,9 +33,20 @@ local selectedDebug = 'all' -- debug dropdown menu selection
 local selectedSharedList = nil -- shared lists table selected list
 local selectedSharedListItem = nil -- shared lists list table selected entry
 
-local MA_INI_LVL_PATTERN = 'MuleAssist_%s_%s_%d.ini'
-local MA_INI_NOLVL_PATTERN = 'MuleAssist_%s_%s.ini'
-local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
+local macroSchema = 'ma'
+local INI_PATTERNS = {
+    ['ma'] = {
+        ['level'] = 'MuleAssist_%s_%s_%d.ini',
+        ['nolevel'] = 'MuleAssist_%s_%s.ini'
+    },
+    ['ka'] = {
+        ['nolevel'] = 'KissAssist_%s.ini'
+    }
+}
+local StartCommand = {
+    ['ma'] = '/mac muleassist assist ${Group.MainAssist}',
+    ['ka'] = '/mac kissassist assist ${Group.MainAssist}'
+}
 local INIFile = nil -- file name of character INI to load
 local INIFileContents = nil -- raw file contents for raw INI tab
 local config = nil -- lua table version of INI content
@@ -61,25 +74,25 @@ end
 local function Split(input, sep, limit, bRegexp)
     assert(sep ~= '')
     assert(limit == nil or limit >= 1)
- 
+
     local aRecord = {}
- 
+
     if input:len() > 0 then
-       local bPlain = not bRegexp
-       limit = limit or -1
- 
-       local nField, nStart = 1, 1
-       local nFirst,nLast = input:find(sep, nStart, bPlain)
-       while nFirst and limit ~= 0 do
-          aRecord[nField] = input:sub(nStart, nFirst-1)
-          nField = nField+1
-          nStart = nLast+1
-          nFirst,nLast = input:find(sep, nStart, bPlain)
-          limit = limit-1
-       end
-       aRecord[nField] = input:sub(nStart)
+        local bPlain = not bRegexp
+        limit = limit or -1
+
+        local nField, nStart = 1, 1
+        local nFirst,nLast = input:find(sep, nStart, bPlain)
+        while nFirst and limit ~= 0 do
+            aRecord[nField] = input:sub(nStart, nFirst-1)
+            nField = nField+1
+            nStart = nLast+1
+            nFirst,nLast = input:find(sep, nStart, bPlain)
+            limit = limit-1
+        end
+        aRecord[nField] = input:sub(nStart)
     end
- 
+
     return aRecord
 end
 
@@ -110,25 +123,30 @@ local function CopyFile(source, dest)
     io.close(f)
 end
 
-local function FindINIFileName()
-    if FileExists(mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)) then
-        return MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
-    elseif FileExists(mq.configDir..'/'..MA_INI_NOLVL_PATTERN:format(myServer, myName)) then
-        return MA_INI_NOLVL_PATTERN:format(myServer, myName)
-    else
-        local fileLevel = myLevel-1
-        repeat
-            local fileName = MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
-            if FileExists(mq.configDir..'/'..fileName) then
-                local targetFileName = MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
-                CopyFile(mq.configDir..'/'..fileName, mq.configDir..'/'..targetFileName)
-                printf('Copying %s to %s', fileName, targetFileName)
-                return targetFileName
-            end
-            fileLevel = fileLevel-1
-        until fileLevel == myLevel-10
+local function FindINIFile()
+    if macroSchema == 'ma' then
+        if FileExists(mq.configDir..'/'..INI_PATTERNS[macroSchema]['level']:format(myServer, myName, myLevel)) then
+            return INI_PATTERNS[macroSchema]['level']:format(myServer, myName, myLevel)
+        elseif FileExists(mq.configDir..'/'..INI_PATTERNS[macroSchema]['nolevel']:format(myServer, myName)) then
+            return INI_PATTERNS[macroSchema]['nolevel']:format(myServer, myName)
+        else
+            local fileLevel = myLevel-1
+            repeat
+                local fileName = INI_PATTERNS[macroSchema]['level']:format(myServer, myName, fileLevel)
+                if FileExists(mq.configDir..'/'..fileName) then
+                    local targetFileName = INI_PATTERNS[macroSchema]['level']:format(myServer, myName, myLevel)
+                    CopyFile(mq.configDir..'/'..fileName, mq.configDir..'/'..targetFileName)
+                    printf('Copying %s to %s', fileName, targetFileName)
+                    return targetFileName
+                end
+                fileLevel = fileLevel-1
+            until fileLevel == myLevel-10
+        end
+    elseif macroSchema == 'ka' then
+        if FileExists(mq.configDir..'/'..INI_PATTERNS[macroSchema]['nolevel']:format(myName)) then
+            return INI_PATTERNS[macroSchema]['nolevel']:format(myName)
+        end
     end
-    return nil
 end
 
 local function HelpMarker(desc)
@@ -168,7 +186,7 @@ local function Save()
             end
         end
     end
-    LIP.save(mq.configDir..'/'..INIFile, config)
+    LIP.save(mq.configDir..'/'..INIFile, config, schema)
 end
 
 -- Ability menu initializers
@@ -820,7 +838,7 @@ local function DrawListsTab()
     ImGui.Text('Select a list below to edit:')
     ImGui.SameLine()
     if ImGui.SmallButton('Save Lemons INI') then
-        LIP.save(LEMONS_INFO_INI, lemons_info)
+        LIP.save(LEMONS_INFO_INI, lemons_info, schema)
     end
     ImGui.SameLine()
     if ImGui.SmallButton('Reload Lemons INI') then
@@ -932,7 +950,11 @@ local function DrawSplitter(thickness, size0, min_size0)
 end
 
 -- Define this down here since the functions need to be defined first
-local customSections = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab}
+local customSections = {
+    ['ma'] = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab},
+    ['ka'] = {['Raw INI']=DrawRawINIEditTab}
+}
+
 local function LeftPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("left", leftPanelWidth, y-1, true) then
@@ -964,7 +986,7 @@ local function LeftPaneWindow()
             end
             ImGui.Separator()
             ImGui.Separator()
-            for section,_ in pairs(customSections) do
+            for section,_ in pairs(customSections[macroSchema]) do
                 ImGui.TableNextRow()
                 ImGui.TableNextColumn()
                 if ImGui.Selectable(section, selectedSection == section) then
@@ -980,8 +1002,8 @@ end
 local function RightPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("right", x, y-1, true) then
-        if customSections[selectedSection] then
-            customSections[selectedSection]()
+        if customSections[macroSchema][selectedSection] then
+            customSections[macroSchema][selectedSection]()
         else
             DrawSection(selectedSection, schema[selectedSection])
         end
@@ -998,7 +1020,50 @@ local function DrawWindowPanels()
     ImGui.PopStyleVar()
 end
 
+local function SetMAVars()
+    schema = require 'ma.schemas.ma'
+    INIFile = FindINIFile()
+    if INIFile then
+        config = LIP.load(mq.configDir..'/'..INIFile)
+        INIFileContents = ReadRawINIFile()
+    else
+        INIFile = INI_PATTERNS['ma']['level']:format(myServer, myName, myLevel)
+        config = {}
+    end
+end
+
+local function SetKAVars()
+    schema = require 'ma.schemas.ka'
+    INIFile = FindINIFile()
+    if INIFile then
+        config = LIP.load(mq.configDir..'/'..INIFile)
+        INIFileContents = ReadRawINIFile()
+    else
+        INIFile = INI_PATTERNS['ka']['nolevel']:format(myName)
+        config = {}
+    end
+end
+
+local radioValue = 1
 local function DrawWindowHeaderSettings()
+    radioValue,_ = ImGui.RadioButton("MuleAssist", radioValue, 1)
+    ImGui.SameLine()
+    radioValue,_ = ImGui.RadioButton("KissAssist", radioValue, 2)
+    if radioValue == 1 then
+        if macroSchema ~= 'ma' then
+            print('ma selected')
+            macroSchema = 'ma'
+            SetMAVars()
+        end
+    elseif radioValue == 2 then
+        if macroSchema ~= 'ka' then
+            print('ka selected')
+            macroSchema = 'ka'
+            SetKAVars()
+        end
+    end
+    ImGui.Separator()
+
     ImGui.Text('INI File: ')
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
@@ -1013,21 +1078,41 @@ local function DrawWindowHeaderSettings()
     if ImGui.Button('Reload INI') then
         config = LIP.load(mq.configDir..'/'..INIFile)
     end
+    --[[
+    ImGui.SameLine()
+    if ImGui.BeginCombo('Macro', macroSchema) then
+        if ImGui.Selectable('ma', macroSchema == 'ma') then
+            if macroSchema ~= 'ma' then
+                print('ma selected')
+                macroSchema = 'ma'
+                SetMAVars()
+            end
+        end
+        if ImGui.Selectable('ka', macroSchema == 'ka') then
+            if macroSchema ~= 'ka' then
+                print('ka selected')
+                macroSchema = 'ka'
+                SetKAVars()
+            end
+        end
+        ImGui.EndCombo()
+    end
+    --]]
     ImGui.Separator()
     ImGui.Text('Start Command: ')
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(350)
-    StartCommand,_ = ImGui.InputText('##StartCommand', StartCommand)
+    StartCommand[macroSchema],_ = ImGui.InputText('##StartCommand', StartCommand[macroSchema])
     ImGui.SameLine()
     if ImGui.Button('Start Macro') then
-        mq.cmd(StartCommand)
+        mq.cmd(StartCommand[macroSchema])
     end
     ImGui.Separator()
 end
 
 local MAUI = function()
-    open, shouldDrawUI = ImGui.Begin('MuleAssist UI (v'..version..')###MuleAssist', open)
+    open, shouldDrawUI = ImGui.Begin('MAUI (v'..version..')###MuleAssist', open)
     if shouldDrawUI then
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
         if initialRun then
@@ -1044,12 +1129,13 @@ local MAUI = function()
 end
 
 -- Load INI into table as well as raw content
-INIFile = FindINIFileName()
+--INIFile = FindINIFileName()
+INIFile = FindINIFile()
 if INIFile then
     config = LIP.load(mq.configDir..'/'..INIFile)
     INIFileContents = ReadRawINIFile()
 else
-    INIFile = MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+    INIFile = INI_PATTERNS['ma']['level']:format(myServer, myName, myLevel)
     config = {}
 end
 if FileExists(LEMONS_INFO_INI) then
