@@ -3,12 +3,11 @@ local mq = require 'mq'
 --- @type ImGui
 require 'ImGui'
 local LIP = require 'ma.LIP'
+local globals = require 'ma.globals'
+local utils = require 'ma.utils'
 
-local version = '0.5.3'
-
-local schemas = {'ma','ka'}
-local currentSchema = 'ma'
-local schema = require('ma.schemas.'..currentSchema)
+globals.CurrentSchema = 'ma'
+globals.Schema = require('ma.schemas.'..globals.CurrentSchema)
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -32,150 +31,37 @@ local leftPanelWidth = 150
 local selectedListItem = {nil, 0} -- {key, index}
 local selectedUpgrade = nil
 local selectedSection = 'General' -- Left hand menu selected item
-local selectedDebug = 'all' -- debug dropdown menu selection
-local selectedSharedList = nil -- shared lists table selected list
-local selectedSharedListItem = nil -- shared lists list table selected entry
 
-local INIFile = nil -- file name of character INI to load
-local INIFileContents = nil -- raw file contents for raw INI tab
-local config = nil -- lua table version of INI content
-local myServer = mq.TLO.EverQuest.Server()
-local myName = mq.TLO.Me.CleanName()
-local myLevel = mq.TLO.Me.Level()
-local myClass = mq.TLO.Me.Class.ShortName():lower()
+globals.MyServer = mq.TLO.EverQuest.Server()
+globals.MyName = mq.TLO.Me.CleanName()
+globals.MyLevel = mq.TLO.Me.Level()
+globals.MyClass = mq.TLO.Me.Class.ShortName():lower()
 
 -- Storage for spell/AA/disc picker
 local spells, altAbilities, discs = {categories={}},{},{}
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
-local LEMONS_INFO_INI = mq.configDir..'/Lemons_Info.ini'
-local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
 
-local lemons_info = {}
-local DEBUG = {all=false,dps=false,heal=false,buff=false,cast=false,combat=false,move=false,mez=false,pet=false,pull=false,chain=false,target=false}
-local debugCaptureTime = '60'
-
--- Helper functions
-local function printf(...)
-    print(string.format(...))
-end
-
-local function Split(input, sep, limit, bRegexp)
-    assert(sep ~= '')
-    assert(limit == nil or limit >= 1)
-
-    local aRecord = {}
-
-    if input:len() > 0 then
-        local bPlain = not bRegexp
-        limit = limit or -1
-
-        local nField, nStart = 1, 1
-        local nFirst,nLast = input:find(sep, nStart, bPlain)
-        while nFirst and limit ~= 0 do
-            aRecord[nField] = input:sub(nStart, nFirst-1)
-            nField = nField+1
-            nStart = nLast+1
-            nFirst,nLast = input:find(sep, nStart, bPlain)
-            limit = limit-1
-        end
-        aRecord[nField] = input:sub(nStart)
-    end
-
-    return aRecord
-end
-
-local function ReadRawINIFile()
-    local f = io.open(mq.configDir..'/'..INIFile, 'r')
-    local contents = f:read('*a')
-    io.close(f)
-    return contents
-end
-
-local function WriteRawINIFile(contents)
-    local f = io.open(mq.configDir..'/'..INIFile, 'w')
-    f:write(contents)
-    io.close(f)
-end
-
-local function FileExists(path)
-    local f = io.open(path, "r")
-    if f ~= nil then io.close(f) return true else return false end
-end
-
-local function CopyFile(source, dest)
-    local f = io.open(source, 'r')
-    local contents = f:read('*a')
-    io.close(f)
-    f = io.open(dest, 'w')
-    f:write(contents)
-    io.close(f)
-end
-
-local function FindINIFile()
-    if currentSchema == 'ma' then
-        if FileExists(mq.configDir..'/'..schema['INI_PATTERNS']['level']:format(myServer, myName, myLevel)) then
-            return schema['INI_PATTERNS']['level']:format(myServer, myName, myLevel)
-        elseif FileExists(mq.configDir..'/'..schema['INI_PATTERNS']['nolevel']:format(myServer, myName)) then
-            return schema['INI_PATTERNS']['nolevel']:format(myServer, myName)
-        else
-            local fileLevel = myLevel-1
-            repeat
-                local fileName = schema['INI_PATTERNS']['level']:format(myServer, myName, fileLevel)
-                if FileExists(mq.configDir..'/'..fileName) then
-                    local targetFileName = schema['INI_PATTERNS']['level']:format(myServer, myName, myLevel)
-                    CopyFile(mq.configDir..'/'..fileName, mq.configDir..'/'..targetFileName)
-                    printf('Copying %s to %s', fileName, targetFileName)
-                    return targetFileName
-                end
-                fileLevel = fileLevel-1
-            until fileLevel == myLevel-10
-        end
-    elseif currentSchema == 'ka' then
-        if FileExists(mq.configDir..'/'..schema['INI_PATTERNS']['nolevel']:format(myName)) then
-            return schema['INI_PATTERNS']['nolevel']:format(myName)
-        end
-    end
-end
-
-local function HelpMarker(desc)
-    ImGui.TextDisabled('(?)')
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
-        ImGui.Text(desc)
-        ImGui.PopTextWrapPos()
-        ImGui.EndTooltip()
-    end
-end
-
--- convert INI 0/1 to true/false for ImGui checkboxes
-local function InitCheckBoxValue(value)
-    if value then
-        if type(value) == 'boolean' then return value end
-        if type(value) == 'number' then return value ~= 0 end
-        if type(value) == 'string' and value:upper() == 'TRUE' then return true else return false end
-    else
-        return false
-    end
-end
+--local customSections = require('ma.addons.'..globals.CurrentSchema)
+local ok, customSections = pcall(require, 'ma.addons.'..globals.CurrentSchema)
+if not ok then customSections = nil end
 
 local function Save()
     -- Set "NULL" string values to nil so they aren't saved
-    for sectionName,sectionProperties in pairs(config) do
+    for sectionName,sectionProperties in pairs(globals.Config) do
         for key,value in pairs(sectionProperties) do
             if value == 'NULL' then
                 -- Replace and XYZCond#=FALSE with nil as well if no corresponding XYZ# value
                 local word = string.match(key, '[^%d]+')
                 local number = string.match(key, '%d+')
                 if number then
-                    config[sectionName][word..'Cond'..number] = nil
+                    globals.Config[sectionName][word..'Cond'..number] = nil
                 end
-                config[sectionName][key] = nil
+                globals.Config[sectionName][key] = nil
             end
         end
     end
-    LIP.save(mq.configDir..'/'..INIFile, config, schema)
+    LIP.save(mq.configDir..'/'..globals.INIFile, globals.Config, globals.Schema)
 end
 
 -- Ability menu initializers
@@ -202,7 +88,7 @@ local function InitSpellTree()
                 spells[spell.Category()][spell.Subcategory()] = {}
                 table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
             end
-            if spell.Level() >= myLevel-30 then
+            if spell.Level() >= globals.MyLevel-30 then
                 local name = spell.Name():gsub(' Rk%..*', '')
                 table.insert(spells[spell.Category()][spell.Subcategory()], name)
             end
@@ -344,10 +230,10 @@ end
 -- sectionName+key+index defines where to store the result
 -- selectedIdx is used to clear spell upgrade input incase of updating over an existing entry
 local function DrawSpellPicker(sectionName, key, index)
-    if not config[sectionName][key..index] then
-        config[sectionName][key..index] = ''
+    if not globals.Config[sectionName][key..index] then
+        globals.Config[sectionName][key..index] = ''
     end
-    local valueParts = Split(config[sectionName][key..index],'|',1)
+    local valueParts = utils.Split(globals.Config[sectionName][key..index],'|',1)
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
@@ -411,9 +297,9 @@ local function DrawSpellPicker(sectionName, key, index)
         end
         ImGui.EndPopup()
     end
-    config[sectionName][key..index] = table.concat(valueParts, '|')
-    if config[sectionName][key..index] == '|' then
-        config[sectionName][key..index] = 'NULL'
+    globals.Config[sectionName][key..index] = table.concat(valueParts, '|')
+    if globals.Config[sectionName][key..index] == '|' then
+        globals.Config[sectionName][key..index] = 'NULL'
     end
 end
 
@@ -435,7 +321,7 @@ end
 
 local function CheckInputType(key, value, typestring, inputtype)
     if type(value) ~= typestring then
-        printf('\arWARNING [%s]: %s value is not a %s: type=%s value=%s\a-x', key, inputtype, typestring, type(value), tostring(value))
+        utils.printf('\arWARNING [%s]: %s value is not a %s: type=%s value=%s\a-x', key, inputtype, typestring, type(value), tostring(value))
     end
 end
 
@@ -444,7 +330,7 @@ local function DrawKeyAndInputText(keyText, label, value, helpText)
     ImGui.Text(keyText)
     ImGui.PopStyleColor()
     ImGui.SameLine()
-    HelpMarker(helpText)
+    utils.HelpMarker(helpText)
     ImGui.SameLine()
     ImGui.SetCursorPosX(175)
     -- the first part, spell/item/disc name, /command, etc
@@ -456,11 +342,11 @@ end
 local function DrawSelectedListItem(sectionName, key, value)
     local valueKey = key..selectedListItem[2]
     -- make sure values not nil so imgui inputs don't barf
-    if config[sectionName][valueKey] == nil then
-        config[sectionName][valueKey] = 'NULL'
+    if globals.Config[sectionName][valueKey] == nil then
+        globals.Config[sectionName][valueKey] = 'NULL'
     end
     -- split the value so we can update spell name and stuff after the | individually
-    local valueParts = Split(config[sectionName][valueKey], '|', 1)
+    local valueParts = utils.Split(globals.Config[sectionName][valueKey], '|', 1)
     -- the first part, spell/item/disc name, /command, etc
     if not valueParts[1] then valueParts[1] = '' end
     -- the rest of the stuff after the first |, classes, percents, oog, etc
@@ -476,10 +362,10 @@ local function DrawSelectedListItem(sectionName, key, value)
     valueParts[2] = DrawKeyAndInputText('Options: ', '##'..sectionName..valueKey..'options', valueParts[2], value['OptionsTooltip'])
     if value['Conditions'] then
         local valueCondKey = key..'Cond'..selectedListItem[2]
-        if config[sectionName][valueCondKey] == nil then
-            config[sectionName][valueCondKey] = 'NULL'
+        if globals.Config[sectionName][valueCondKey] == nil then
+            globals.Config[sectionName][valueCondKey] = 'NULL'
         end
-        config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, config[sectionName][valueCondKey], value['CondTooltip'])
+        globals.Config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, globals.Config[sectionName][valueCondKey], value['CondTooltip'])
     end
     local spell = mq.TLO.Spell(valueParts[1])
     if mq.TLO.Me.Book(spell.RankName())() then
@@ -487,12 +373,12 @@ local function DrawSelectedListItem(sectionName, key, value)
         if upgradeResult then valueParts[1] = upgradeResult end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
-        config[sectionName][valueKey] = valueParts[1]
+        globals.Config[sectionName][valueKey] = valueParts[1]
         if valueParts[2] and string.len(valueParts[2]) > 0 then
-            config[sectionName][valueKey] = config[sectionName][valueKey]..'|'..valueParts[2]:gsub('|$','')
+            globals.Config[sectionName][valueKey] = globals.Config[sectionName][valueKey]..'|'..valueParts[2]:gsub('|$','')
         end
     else
-        config[sectionName][valueKey] = ''
+        globals.Config[sectionName][valueKey] = ''
     end
     ImGui.Separator()
 end
@@ -538,8 +424,8 @@ end
 
 local function DrawSpellIconOrButton(sectionName, key, index)
     local iniValue = nil
-    if config[sectionName][key..index] and config[sectionName][key..index] ~= 'NULL' then
-        iniValue = Split(config[sectionName][key..index],'|',1)[1]
+    if globals.Config[sectionName][key..index] and globals.Config[sectionName][key..index] ~= 'NULL' then
+        iniValue = utils.Split(globals.Config[sectionName][key..index],'|',1)[1]
     end
     local charHasAbility = ValidSpellOrItem(iniValue)
     local iconSize = {30,30} -- default icon size
@@ -586,10 +472,10 @@ local function DrawList(sectionName, key, value)
     ImGui.Text(key..'Size: ')
     ImGui.PopStyleColor()
     ImGui.SameLine()
-    HelpMarker(value['SizeTooltip'])
+    utils.HelpMarker(value['SizeTooltip'])
     ImGui.SameLine()
     ImGui.PushItemWidth(100)
-    local size = config[sectionName][key..'Size']
+    local size = globals.Config[sectionName][key..'Size']
     if size == nil or type(size) ~= 'number' then
         CheckInputType(key..'Size', size, 'number', 'InputInt')
         size = 0
@@ -615,18 +501,18 @@ local function DrawList(sectionName, key, value)
             ImGui.SameLine()
         end
     end
-    config[sectionName][key..'Size'] = size
+    globals.Config[sectionName][key..'Size'] = size
 end
 
 local function DrawMultiPartProperty(sectionName, key, value)
     -- TODO: what's a nice clean way to represent values which are multiple parts? 
     -- Currently just using this experimentally with RezAcceptOn
-    local parts = Split(config[sectionName][key], '|',1)
+    local parts = utils.Split(globals.Config[sectionName][key], '|',1)
     for partIdx,part in ipairs(value['Parts']) do
         if part['Type'] == 'SWITCH' then
             ImGui.Text(part['Name']..': ')
             ImGui.SameLine()
-            local value = InitCheckBoxValue(tonumber(parts[partIdx]))
+            local value = utils.InitCheckBoxValue(tonumber(parts[partIdx]))
             CheckInputType(key, value, 'boolean', 'Checkbox')
             parts[partIdx] = ImGui.Checkbox('##'..key, value)
             if parts[partIdx] then parts[partIdx] = '1' else parts[partIdx] = '0' end
@@ -646,7 +532,7 @@ local function DrawMultiPartProperty(sectionName, key, value)
             end
             parts[partIdx] = tostring(parts[partIdx])
         end
-        config[sectionName][key] = table.concat(parts, '|')
+        globals.Config[sectionName][key] = table.concat(parts, '|')
         if partIdx == 1 then
             ImGui.SameLine()
         end
@@ -659,43 +545,43 @@ local function DrawProperty(sectionName, key, value)
     ImGui.Text(key..': ')
     ImGui.PopStyleColor()
     ImGui.SameLine()
-    HelpMarker(value['Tooltip'])
+    utils.HelpMarker(value['Tooltip'])
     ImGui.SameLine()
-    if config[sectionName][key] == nil then
-        config[sectionName][key] = 'NULL'
+    if globals.Config[sectionName][key] == nil then
+        globals.Config[sectionName][key] = 'NULL'
     end
     ImGui.SetCursorPosX(175)
     if value['Type'] == 'SWITCH' then
-        local initialValue = InitCheckBoxValue(config[sectionName][key])
+        local initialValue = utils.InitCheckBoxValue(globals.Config[sectionName][key])
         CheckInputType(key, initialValue, 'boolean', 'Checkbox')
-        config[sectionName][key] = ImGui.Checkbox('##'..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.Checkbox('##'..key, initialValue)
     elseif value['Type'] == 'SPELL' then
         DrawSpellIconOrButton(sectionName, key, '')
         ImGui.SameLine()
         ImGui.PushItemWidth(350)
-        local initialValue = config[sectionName][key]
+        local initialValue = globals.Config[sectionName][key]
         CheckInputType(key, initialValue, 'string', 'InputText')
-        config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
     elseif value['Type'] == 'NUMBER' then
-        local initialValue = config[sectionName][key]
+        local initialValue = globals.Config[sectionName][key]
         if not initialValue or initialValue == 'NULL' or type(initialValue) ~= 'number' then
             CheckInputType(key, initialValue, 'number', 'InputInt')
             initialValue = 0
         end
         ImGui.PushItemWidth(350)
-        config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.InputInt('##'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
-        if value['Min'] and config[sectionName][key] < value['Min'] then
-            config[sectionName][key] = value['Min']
-        elseif value['Max'] and config[sectionName][key] > value['Max'] then
-            config[sectionName][key] = value['Max']
+        if value['Min'] and globals.Config[sectionName][key] < value['Min'] then
+            globals.Config[sectionName][key] = value['Min']
+        elseif value['Max'] and globals.Config[sectionName][key] > value['Max'] then
+            globals.Config[sectionName][key] = value['Max']
         end
     elseif value['Type'] == 'STRING' then
         ImGui.PushItemWidth(350)
-        local initialValue = tostring(config[sectionName][key])
+        local initialValue = tostring(globals.Config[sectionName][key])
         CheckInputType(key, initialValue, 'string', 'InputText')
-        config[sectionName][key] = ImGui.InputText('##'..sectionName..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.InputText('##'..sectionName..key, initialValue)
         ImGui.PopItemWidth()
     elseif value['Type'] == 'MULTIPART' then
         DrawMultiPartProperty(sectionName, key, value)
@@ -706,25 +592,25 @@ end
 local function DrawSectionControlSwitches(sectionName, sectionProperties)
     if sectionProperties['On'] then
         if sectionProperties['On']['Type'] == 'SWITCH' then
-            local value = InitCheckBoxValue(config[sectionName][sectionName..'On'])
+            local value = utils.InitCheckBoxValue(globals.Config[sectionName][sectionName..'On'])
             CheckInputType(sectionName..'On', value, 'boolean', 'Checkbox')
-            config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', value)
+            globals.Config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', value)
         elseif sectionProperties['On']['Type'] == 'NUMBER' then
             -- Type=NUMBER control switch mostly a special case for DPS section only
-            if not config[sectionName][sectionName..'On'] then config[sectionName][sectionName..'On'] = 0 end
+            if not globals.Config[sectionName][sectionName..'On'] then globals.Config[sectionName][sectionName..'On'] = 0 end
             ImGui.PushItemWidth(100)
-            config[sectionName][sectionName..'On'] = ImGui.InputInt(sectionName..'On', config[sectionName][sectionName..'On'])
+            globals.Config[sectionName][sectionName..'On'] = ImGui.InputInt(sectionName..'On', globals.Config[sectionName][sectionName..'On'])
             ImGui.PopItemWidth()
-            if sectionProperties['On']['Min'] and config[sectionName][sectionName..'On'] < sectionProperties['On']['Min'] then
-                config[sectionName][sectionName..'On'] = sectionProperties['On']['Min']
-            elseif sectionProperties['On']['Max'] and config[sectionName][sectionName..'On'] > sectionProperties['On']['Max'] then
-                config[sectionName][sectionName..'On'] = sectionProperties['On']['Max']
+            if sectionProperties['On']['Min'] and globals.Config[sectionName][sectionName..'On'] < sectionProperties['On']['Min'] then
+                globals.Config[sectionName][sectionName..'On'] = sectionProperties['On']['Min']
+            elseif sectionProperties['On']['Max'] and globals.Config[sectionName][sectionName..'On'] > sectionProperties['On']['Max'] then
+                globals.Config[sectionName][sectionName..'On'] = sectionProperties['On']['Max']
             end
         end
         if sectionProperties['COn'] then ImGui.SameLine() end
     end
     if sectionProperties['COn'] then
-        config[sectionName][sectionName..'COn'] = ImGui.Checkbox(sectionName..'COn', InitCheckBoxValue(config[sectionName][sectionName..'COn']))
+        globals.Config[sectionName][sectionName..'COn'] = ImGui.Checkbox(sectionName..'COn', utils.InitCheckBoxValue(globals.Config[sectionName][sectionName..'COn']))
     end
     ImGui.Separator()
 end
@@ -746,23 +632,23 @@ end
 
 local function DrawSpells(spellSection)
     ImGui.TextColored(1, 1, 0, 1, spellSection)
-    if config[spellSection] then
+    if globals.Config[spellSection] then
         DrawSpellsGemList(spellSection)
     end
     if ImGui.Button('Update from spell bar') then
-        if not config[spellSection] then config[spellSection] = {} end
+        if not globals.Config[spellSection] then globals.Config[spellSection] = {} end
         for i=1,13 do
-            config[spellSection]['Gem'..i] = mq.TLO.Me.Gem(i).Name()
+            globals.Config[spellSection]['Gem'..i] = mq.TLO.Me.Gem(i).Name()
         end
         Save()
-        INIFileContents = ReadRawINIFile()
+        globals.INIFileContents = utils.ReadRawglobals.INIFile()
     end
 end
 
 -- Draw an INI section tab
 local function DrawSection(sectionName, sectionProperties)
-    if not config[sectionName] then
-        config[sectionName] = {}
+    if not globals.Config[sectionName] then
+        globals.Config[sectionName] = {}
     end
     -- Draw main section control switches first
     if sectionProperties['Controls'] then
@@ -809,112 +695,6 @@ local function DrawSection(sectionName, sectionProperties)
     ImGui.EndChild()
 end
 
-local function DrawRawINIEditTab()
-    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-        if FileExists(mq.configDir..'/'..INIFile) then
-            INIFileContents = ReadRawINIFile()
-        end
-    end
-    if ImGui.Button('Refresh Raw INI##rawini') then
-        if FileExists(mq.configDir..'/'..INIFile) then
-            INIFileContents = ReadRawINIFile()
-        end
-    end
-    ImGui.SameLine()
-    if ImGui.Button('Save Raw INI##rawini') then
-        WriteRawINIFile(INIFileContents)
-        config = LIP.load(mq.configDir..'/'..INIFile)
-    end
-    local x,y = ImGui.GetContentRegionAvail()
-    INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
-end
-
-local function DrawListsTab()
-    ImGui.PushTextWrapPos(ImGui.GetContentRegionAvail()-10)
-    ImGui.TextColored(0, 1, 1, 1, "View shared list content from Lemons_Info.ini. To add entries, use the macro /addxyz commands and click reload.")
-    ImGui.PopTextWrapPos()
-    ImGui.Text('Select a list below to edit:')
-    ImGui.SameLine()
-    if ImGui.SmallButton('Save Lemons INI') then
-        LIP.save(LEMONS_INFO_INI, lemons_info, schema)
-    end
-    ImGui.SameLine()
-    if ImGui.SmallButton('Reload Lemons INI') then
-        if FileExists(LEMONS_INFO_INI) then
-            lemons_info = LIP.load(LEMONS_INFO_INI, true)
-        end
-    end
-    if ImGui.BeginTable('ListSelectionTable', 1, TABLE_FLAGS, 0, 150, 0.0) then
-        ImGui.TableSetupColumn('List Name',     0,   -1.0, 1)
-        ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
-        ImGui.TableHeadersRow()
-        local clipper = ImGuiListClipper.new()
-        clipper:Begin(#MA_LISTS)
-        while clipper:Step() do
-            for row_n = clipper.DisplayStart, clipper.DisplayEnd - 1, 1 do
-                local clipName = MA_LISTS[row_n+1]
-                ImGui.PushID(clipName)
-                ImGui.TableNextRow()
-                ImGui.TableNextColumn()
-                local sel = ImGui.Selectable(clipName, selectedSharedList == clipName)
-                if sel then
-                    selectedSharedList = clipName
-                end
-                ImGui.PopID()
-            end
-        end
-        ImGui.EndTable()
-    end
-    if selectedSharedList ~= nil then
-        ImGui.TextColored(1, 1, 0, 1, selectedSharedList)
-        ImGui.SameLine()
-        ImGui.SetCursorPosX(100)
-        ImGui.SameLine()
-        if ImGui.SmallButton('Remove Selected') then
-            lemons_info[selectedSharedList][selectedSharedListItem] = nil
-        end
-        if ImGui.BeginTable('SelectedListTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
-            ImGui.TableSetupColumn('Mob or Zone Short Name',     0,   -1.0, 1)
-            ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
-            ImGui.TableHeadersRow()
-            if lemons_info[selectedSharedList] then
-                for key,_ in pairs(lemons_info[selectedSharedList]) do
-                    ImGui.TableNextRow()
-                    ImGui.TableNextColumn()
-                    local sel = ImGui.Selectable(key, selectedSharedListItem == key)
-                    if sel then
-                        selectedSharedListItem = key
-                    end
-                end
-            end
-            ImGui.EndTable()
-        end
-    end
-end
-
-local function DrawDebugTab()
-    local debuginput = ''
-    for i,j in pairs(DEBUG) do
-        if j then debuginput = debuginput..i end
-    end
-    if ImGui.BeginCombo('Debug Categories', debuginput) then
-        for i,j in pairs(DEBUG) do
-            DEBUG[i] = ImGui.Checkbox(i, j)
-        end
-        ImGui.EndCombo()
-    end
-    debugCaptureTime = ImGui.InputText('Debug Capture Time', debugCaptureTime)
-    if selectedDebug then
-        if ImGui.Button('Enable Debug') then
-            debuginput = ''
-            for i,j in pairs(DEBUG) do
-                if j then debuginput = debuginput..i end
-            end
-            mq.cmdf('/writedebug %s %s', debuginput, debugCaptureTime)
-        end
-    end
-end
-
 local function DrawSplitter(thickness, size0, min_size0)
     local x,y = ImGui.GetCursorPos()
     local delta = 0
@@ -947,12 +727,6 @@ local function DrawSplitter(thickness, size0, min_size0)
     ImGui.SetCursorPosY(y)
 end
 
--- Define this down here since the functions need to be defined first
-local customSections = {
-    ['ma'] = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab},
-    ['ka'] = {['Raw INI']=DrawRawINIEditTab}
-}
-
 local function LeftPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("left", leftPanelWidth, y-1, true) then
@@ -961,13 +735,13 @@ local function LeftPaneWindow()
             ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
             ImGui.TableHeadersRow()
 
-            for _,sectionName in ipairs(schema.Sections) do
-                if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
+            for _,sectionName in ipairs(globals.Schema.Sections) do
+                if globals.Schema[sectionName] and (not globals.Schema[sectionName].Classes or globals.Schema[sectionName].Classes[globals.MyClass]) then
                     ImGui.TableNextRow()
                     ImGui.TableNextColumn()
                     local popStyleColor = false
-                    if schema[sectionName]['Controls'] and schema[sectionName]['Controls']['On'] then
-                        if not config[sectionName] or not config[sectionName][sectionName..'On'] or config[sectionName][sectionName..'On'] == 0 then
+                    if globals.Schema[sectionName]['Controls'] and globals.Schema[sectionName]['Controls']['On'] then
+                        if not globals.Config[sectionName] or not globals.Config[sectionName][sectionName..'On'] or globals.Config[sectionName][sectionName..'On'] == 0 then
                             ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
                         else
                             ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
@@ -984,7 +758,7 @@ local function LeftPaneWindow()
             end
             ImGui.Separator()
             ImGui.Separator()
-            for section,_ in pairs(customSections[currentSchema]) do
+            for section,_ in pairs(customSections) do
                 ImGui.TableNextRow()
                 ImGui.TableNextColumn()
                 if ImGui.Selectable(section, selectedSection == section) then
@@ -1000,10 +774,10 @@ end
 local function RightPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("right", x, y-1, true) then
-        if customSections[currentSchema][selectedSection] then
-            customSections[currentSchema][selectedSection]()
+        if customSections[selectedSection] then
+            customSections[selectedSection]()
         else
-            DrawSection(selectedSection, schema[selectedSection])
+            DrawSection(selectedSection, globals.Schema[selectedSection])
         end
     end
     ImGui.EndChild()
@@ -1018,27 +792,37 @@ local function DrawWindowPanels()
     ImGui.PopStyleVar()
 end
 
-local function SetSchemaVars()
-    schema = require('ma.schemas.'..currentSchema)
-    INIFile = FindINIFile()
-    if INIFile then
-        config = LIP.load(mq.configDir..'/'..INIFile)
-        INIFileContents = ReadRawINIFile()
+local function SetSchemaVars(selectedSchema)
+    local ok, schemaMod = pcall(require, 'ma.schemas.'..selectedSchema)
+    if not ok then print('Error loading schema for: '..selectedSchema) return false end
+    ok, addonMod = pcall(require, 'ma.addons.'..selectedSchema)
+    if not ok then print('Error loading schema for: '..selectedSchema) return false end
+
+    customSections = addonMod
+    globals.Schema = schemaMod
+    globals.CurrentSchema = selectedSchema
+    globals.INIFile = utils.FindINIFile()
+    selectedSection = 'General'
+    if globals.INIFile then
+        globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+        globals.INIFileContents = utils.ReadRawINIFile()
     else
-        INIFile = ''
-        config = {}
+        globals.INIFile = ''
+        globals.Config = {}
     end
+    return true
 end
 
 local radioValue = 1
 local function DrawWindowHeaderSettings()
-    for idx, schema_kind in ipairs(schemas) do
+    for idx, schema_kind in ipairs(globals.Schemas) do
         radioValue,_ = ImGui.RadioButton(schema_kind, radioValue, idx)
         ImGui.SameLine()
     end
-    if currentSchema ~= schemas[radioValue] then
-        currentSchema = schemas[radioValue]
-        SetSchemaVars()
+    if globals.CurrentSchema ~= globals.Schemas[radioValue] then
+        if not SetSchemaVars(globals.Schemas[radioValue]) then
+            radioValue = 1
+        end
     end
     ImGui.NewLine()
     ImGui.Separator()
@@ -1047,15 +831,15 @@ local function DrawWindowHeaderSettings()
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(350)
-    INIFile,_ = ImGui.InputText('##INIInput', INIFile)
+    globals.INIFile,_ = ImGui.InputText('##INIInput', globals.INIFile)
     ImGui.SameLine()
     if ImGui.Button('Save INI') then
         Save()
-        INIFileContents = ReadRawINIFile()
+        globals.INIFileContents = utils.ReadRawglobals.INIFile()
     end
     ImGui.SameLine()
     if ImGui.Button('Reload INI') then
-        config = LIP.load(mq.configDir..'/'..INIFile)
+        globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
     end
     
     ImGui.Separator()
@@ -1063,16 +847,16 @@ local function DrawWindowHeaderSettings()
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(350)
-    schema['StartCommand'],_ = ImGui.InputText('##StartCommand', schema['StartCommand'])
+    globals.Schema['StartCommand'],_ = ImGui.InputText('##StartCommand', globals.Schema['StartCommand'])
     ImGui.SameLine()
     if ImGui.Button('Start Macro') then
-        mq.cmd(schema['StartCommand'])
+        mq.cmd(globals.Schema['StartCommand'])
     end
     ImGui.Separator()
 end
 
 local MAUI = function()
-    open, shouldDrawUI = ImGui.Begin('MAUI (v'..version..')###MuleAssist', open)
+    open, shouldDrawUI = ImGui.Begin('MAUI (v'..globals.Version..')###MuleAssist', open)
     if shouldDrawUI then
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
         if initialRun then
@@ -1089,16 +873,13 @@ local MAUI = function()
 end
 
 -- Load INI into table as well as raw content
-INIFile = FindINIFile()
-if INIFile then
-    config = LIP.load(mq.configDir..'/'..INIFile)
-    INIFileContents = ReadRawINIFile()
+globals.INIFile = utils.FindINIFile()
+if globals.INIFile then
+    globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+    globals.INIFileContents = utils.ReadRawINIFile()
 else
-    INIFile = schema['INI_PATTERNS']['level']:format(myServer, myName, myLevel)
-    config = {}
-end
-if FileExists(LEMONS_INFO_INI) then
-    lemons_info = LIP.load(LEMONS_INFO_INI, true)
+    globals.INIFile = globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)
+    globals.Config = {}
 end
 
 local initCo = coroutine.create(function()
