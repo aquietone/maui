@@ -130,7 +130,7 @@ local schema = {
             },
             MiscGemLW={-- int (0)
                 Type='NUMBER',
-                Min=1,
+                Min=0,
                 Max=13,
                 Tooltip='Similar to (MiscGemRemem), however this is used for LONG MEMORIZATION / LONG RECAST time spells.',
             },

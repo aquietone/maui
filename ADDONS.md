@@ -1,5 +1,7 @@
 # Extending MAUI to support other INI based macros
 
+Ignore these instructions for now... this whole thing is still a WIP.
+
 ## Addons folder
 
 Add a new addon file such as `ka.lua`.
@@ -26,8 +28,8 @@ Just copy one of the existing ones and fit it to the new macro.
 
 ```lua
     INI_PATTERNS = {
-            ['level'] = 'MuleAssist_%s_%s_%d.ini',
-            ['nolevel'] = 'MuleAssist_%s_%s.ini',
+        ['level'] = 'MuleAssist_%s_%s_%d.ini',
+        ['nolevel'] = 'MuleAssist_%s_%s.ini',
     },
 ```
 
@@ -91,26 +93,3 @@ Right now, things are hardcoded to know what pattern to use and how many variabl
         },
     },
 ```
-
-## Add the schema name to the list of schemas
-
-In `start.lua`:
-```lua
-local schemas = {'ma','ka'}
-```
-
-## Implement custom sections
-
-To have entries on the left hand panel that don't correspond to a section in the INI file, currently they
-are implemented as "custom" sections.
-
-In `start.lua`:
-```lua
--- Define this down here since the functions need to be defined first
-local customSections = {
-    ['ma'] = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab},
-    ['ka'] = {['Raw INI']=DrawRawINIEditTab}
-}
-```
-
-Ideally these would be refactored out into pluggable per-macro impl and included like the schemas, but they aren't for now.
