@@ -641,7 +641,7 @@ local function DrawSpells(spellSection)
             globals.Config[spellSection]['Gem'..i] = mq.TLO.Me.Gem(i).Name()
         end
         Save()
-        globals.INIFileContents = utils.ReadRawglobals.INIFile()
+        globals.INIFileContents = utils.ReadRawINIFile()
     end
 end
 
@@ -835,7 +835,7 @@ local function DrawWindowHeaderSettings()
     ImGui.SameLine()
     if ImGui.Button('Save INI') then
         Save()
-        globals.INIFileContents = utils.ReadRawglobals.INIFile()
+        globals.INIFileContents = utils.ReadRawINIFile()
     end
     ImGui.SameLine()
     if ImGui.Button('Reload INI') then
