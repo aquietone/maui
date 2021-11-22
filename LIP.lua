@@ -24,7 +24,6 @@
 --@author Dynodzzo
 
 local LIP = {};
-local schema = require 'ma.schema'
 
 --- Returns a table containing all the data from the INI file.
 --@param fileName The name of the INI file to parse. [string]
@@ -84,7 +83,7 @@ end
 --- Saves all the data from a table to an INI file.
 --@param fileName The name of the INI file to fill. [string]
 --@param data The table containing all the data to store. [table]
-function LIP.save(fileName, data)
+function LIP.save(fileName, data, schema)
 	assert(type(fileName) == 'string', 'Parameter "fileName" must be a string.');
 	assert(type(data) == 'table', 'Parameter "data" must be a table.');
 	local file = assert(io.open(fileName, 'w+b'), 'Error loading file :' .. fileName);
