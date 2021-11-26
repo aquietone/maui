@@ -341,7 +341,7 @@ local function DrawKeyAndInputText(keyText, label, value, helpText)
     ImGui.SetCursorPosX(175)
     -- the first part, spell/item/disc name, /command, etc
     CheckInputType(label, value, 'string', 'InputText')
-    return ImGui.InputText(label, value)
+    return ImGui.InputText(label, tostring(value))
 end
 
 -- Draw the value and condition of the selected list item
@@ -571,7 +571,7 @@ local function DrawProperty(sectionName, key, value)
         ImGui.PushItemWidth(350)
         local initialValue = globals.Config[sectionName][key]
         CheckInputType(key, initialValue, 'string', 'InputText')
-        globals.Config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, tostring(initialValue))
         ImGui.PopItemWidth()
     elseif value['Type'] == 'NUMBER' then
         local initialValue = globals.Config[sectionName][key]

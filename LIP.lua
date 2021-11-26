@@ -23,6 +23,12 @@
 -- It has never been that simple to use INI files with Lua.
 --@author Dynodzzo
 
+-- Edits for MAUI
+-- LIP.load will load keys with empty values
+---- This is to support reading LemonsInfo INI which stores lists like FireImmune, etc with k/v like "mobname="
+-- LIP.save writes data using the defined schema for the macro, to keep a user friendly ordering of keys
+-- !!! DO NOT OVERWRITE THIS WITH OTHER LIP.lua, OR OVERWRITE OTHER LIP.lua WITH THIS !!!
+
 local LIP = {};
 
 --- Returns a table containing all the data from the INI file.
@@ -64,20 +70,13 @@ function LIP.load(fileName, initNilValues)
 	return data;
 end
 
-local KeySorter = function(a, b)
-	local aNum = tonumber(a:match('%d+'))
-	local bNum = tonumber(b:match('%d+'))
-	if aNum and bNum and aNum < bNum then
-		return true
-	elseif aNum and bNum and bNum < aNum then
-		return false
-	elseif a < b then
-		return true
-	elseif b > a then
-		return false
-	else
-		return false
+local function WriteKV(contents, key, value)
+	if value == true then
+		value = 1
+	elseif value == false then
+		value = 0
 	end
+	return contents .. ('%s=%s\n'):format(key, tostring(value))
 end
 
 --- Saves all the data from a table to an INI file.
@@ -89,22 +88,52 @@ function LIP.save(fileName, data, schema)
 	local file = assert(io.open(fileName, 'w+b'), 'Error loading file :' .. fileName);
 	local contents = '';
 
+	-- iterate over sections from the schema so we can write the INI in a user friendly order
 	for _, sectionKey in ipairs(schema.Sections) do
+		-- proceed if we have data for the section
 		if data[sectionKey] and next(data[sectionKey]) ~= nil then
+			-- write the section key
 			contents = contents .. ('[%s]\n'):format(sectionKey);
-			-- sort the keys before writing the file
-			local keys = {}
-			for k, v in pairs(data[sectionKey]) do table.insert(keys, k) end
-			table.sort(keys, KeySorter)
-
-			for _, k in ipairs(keys) do
-				local value = data[sectionKey][k]
-				if value == true then
-					value = 1
-				elseif value == false then
-					value = 0
+			if schema[sectionKey] then
+				-- if we define controls for the schema section, like BuffsOn, BuffsCOn, write those first
+				if schema[sectionKey]['Controls'] then
+					for k,v in pairs(schema[sectionKey]['Controls']) do
+						contents = WriteKV(contents, sectionKey..k, data[sectionKey][sectionKey..k])
+					end
 				end
-				contents = contents .. ('%s=%s\n'):format(k, tostring(value));
+				-- If we define properties for the schema section, write each of those next
+				if schema[sectionKey]['Properties'] then
+					for k,v in pairs(schema[sectionKey]['Properties']) do
+						-- If the property is a list, like XYZ1, XYZ2, then iterator over XYZSize, writing XYZ# and XYZCond#
+						if v['Type'] == 'LIST' then
+							contents = contents .. ('%s=%s\n'):format(k..'Size', tostring(data[sectionKey][k..'Size']));
+							for i=1,data[sectionKey][k..'Size'] do
+								if data[sectionKey][k..tostring(i)] ~= nil then
+									contents = WriteKV(contents, k..tostring(i), data[sectionKey][k..tostring(i)])
+								end
+								if data[sectionKey][k..'Cond'..tostring(i)] ~= nil then
+									contents = WriteKV(contents, k..'Cond'..tostring(i), data[sectionKey][k..'Cond'..tostring(i)])
+								end
+							end
+						else
+							-- If the property is not a list, just write it
+							if data[sectionKey][k] ~= nil then
+								contents = WriteKV(contents, k, data[sectionKey][k])
+							end
+						end
+					end
+				end
+				for k,value in pairs(data[sectionKey]) do
+					-- Write any remaining keys which are not defined in the schema for the section
+					if not contents:find(k..'=') then
+						contents = WriteKV(contents, k, value)
+					end
+				end
+			else
+				-- The section has no properties defined in the schema, just write them
+				for k, v in pairs(data[sectionKey]) do
+					contents = WriteKV(contents, k, v)
+				end
 			end
 			contents = contents .. '\n';
 		end

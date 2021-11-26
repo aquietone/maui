@@ -63,10 +63,10 @@ end
 
 utils.FindINIFile = function()
     if globals.CurrentSchema == 'ma' then
-        if utils.FileExists(mq.configDir..'/'..globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)) then
-            return globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)
-        elseif utils.FileExists(mq.configDir..'/'..globals.Schema['INI_PATTERNS']['nolevel']:format(globals.MyServer, globals.MyName)) then
+        if utils.FileExists(mq.configDir..'/'..globals.Schema['INI_PATTERNS']['nolevel']:format(globals.MyServer, globals.MyName)) then
             return globals.Schema['INI_PATTERNS']['nolevel']:format(globals.MyServer, globals.MyName)
+        elseif utils.FileExists(mq.configDir..'/'..globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)) then
+            return globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)
         else
             local fileLevel = globals.MyLevel-1
             repeat
