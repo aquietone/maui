@@ -1,3 +1,7 @@
+0.6.1
+- Add tostring in a couple spots where LIP might give us a number when we wanted a string
+- Change LIP to write keys in a more user friendly order
+- Prefer INI with no level over INI with level
 0.6
 - Import KA INI file (WIP, YMMV)
 - MA/KA toggle (WIP, stick to MA)

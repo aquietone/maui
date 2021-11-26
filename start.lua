@@ -68,9 +68,10 @@ end
 local function InitSpellTree()
     -- Sort spells by level
     local SpellSorter = function(a, b)
-        if mq.TLO.Spell(a).Level() < mq.TLO.Spell(b).Level() then
+        -- spell level is in spell[1], name in spell[2]
+        if a[1] < b[1] then
             return false
-        elseif mq.TLO.Spell(b).Level() < mq.TLO.Spell(a).Level() then
+        elseif b[1] < a[1] then
             return true
         else
             return false
@@ -90,7 +91,7 @@ local function InitSpellTree()
             end
             if spell.Level() >= globals.MyLevel-30 then
                 local name = spell.Name():gsub(' Rk%..*', '')
-                table.insert(spells[spell.Category()][spell.Subcategory()], name)
+                table.insert(spells[spell.Category()][spell.Subcategory()], {spell.Level(), name})
             end
         end
     end
@@ -233,7 +234,12 @@ local function DrawSpellPicker(sectionName, key, index)
     if not globals.Config[sectionName][key..index] then
         globals.Config[sectionName][key..index] = ''
     end
-    local valueParts = utils.Split(globals.Config[sectionName][key..index],'|',1)
+    local valueParts = nil
+    if type(globals.Config[sectionName][key..index]) == "string" then
+        valueParts = utils.Split(globals.Config[sectionName][key..index],'|',1)
+    elseif type(globals.Config[sectionName][key..index]) == "number" then
+        valueParts = {tostring(globals.Config[sectionName][key..index])}
+    end
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
@@ -246,10 +252,10 @@ local function DrawSpellPicker(sectionName, key, index)
                             -- Subcategory Spell menu
                             if #spells[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
                                 for _,spell in ipairs(spells[category][subcategory]) do
-                                    local spellLevel = mq.TLO.Spell(spell).Level()
-                                    SetSpellTextColor(spell)
-                                    if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
-                                        valueParts[1] = spell
+                                    -- spell[1]=level, spell[2]=name
+                                    SetSpellTextColor(spell[2])
+                                    if ImGui.MenuItem(spell[1]..' - '..spell[2]..'##'..sectionName..key..subcategory) then
+                                        valueParts[1] = spell[2]
                                         selectedUpgrade = nil
                                     end
                                     ImGui.PopStyleColor()
@@ -335,7 +341,7 @@ local function DrawKeyAndInputText(keyText, label, value, helpText)
     ImGui.SetCursorPosX(175)
     -- the first part, spell/item/disc name, /command, etc
     CheckInputType(label, value, 'string', 'InputText')
-    return ImGui.InputText(label, value)
+    return ImGui.InputText(label, tostring(value))
 end
 
 -- Draw the value and condition of the selected list item
@@ -425,7 +431,11 @@ end
 local function DrawSpellIconOrButton(sectionName, key, index)
     local iniValue = nil
     if globals.Config[sectionName][key..index] and globals.Config[sectionName][key..index] ~= 'NULL' then
-        iniValue = utils.Split(globals.Config[sectionName][key..index],'|',1)[1]
+        if type(globals.Config[sectionName][key..index]) == "string" then
+            iniValue = utils.Split(globals.Config[sectionName][key..index],'|',1)[1]
+        elseif type(globals.Config[sectionName][key..index]) == "number" then
+            iniValue = tostring(globals.Config[sectionName][key..index])
+        end
     end
     local charHasAbility = ValidSpellOrItem(iniValue)
     local iconSize = {30,30} -- default icon size
@@ -561,7 +571,7 @@ local function DrawProperty(sectionName, key, value)
         ImGui.PushItemWidth(350)
         local initialValue = globals.Config[sectionName][key]
         CheckInputType(key, initialValue, 'string', 'InputText')
-        globals.Config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, initialValue)
+        globals.Config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, tostring(initialValue))
         ImGui.PopItemWidth()
     elseif value['Type'] == 'NUMBER' then
         local initialValue = globals.Config[sectionName][key]
