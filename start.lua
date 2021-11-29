@@ -394,6 +394,12 @@ local function DrawPlainListButton(sectionName, key, listIdx, iconSize)
     if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) and type(listIdx) == 'number' then
         selectedListItem = {key, listIdx}
         selectedUpgrade = nil
+    elseif type(listIdx) == 'number' then
+        if ImGui.BeginDragDropSource() then
+            ImGui.SetDragDropPayload("ListBtn", listIdx)
+            ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2])
+            ImGui.EndDragDropSource()
+        end
     end
 end
 
@@ -451,13 +457,27 @@ local function DrawSpellIconOrButton(sectionName, key, index)
     if iniValue then
         -- Use first part of INI value as spell or item name to lookup icon
         if mq.TLO.Spell(iniValue)() then
+            -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
+            ImGui.BeginGroup()
+            local x,y = ImGui.GetCursorPos()
+            ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
+            ImGui.SetCursorPosX(x)
+            ImGui.SetCursorPosY(y)
             local spellIcon = mq.TLO.Spell(iniValue).SpellIcon()
             animSpellIcons:SetTextureCell(spellIcon)
             ImGui.DrawTextureAnimation(animSpellIcons, iconSize[1], iconSize[2])
+            ImGui.EndGroup()
         elseif mq.TLO.FindItem(iniValue)() then
+            -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
+            ImGui.BeginGroup()
+            local x,y = ImGui.GetCursorPos()
+            ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
+            ImGui.SetCursorPosX(x)
+            ImGui.SetCursorPosY(y)
             local itemIcon = mq.TLO.FindItem(iniValue).Icon()
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, iconSize[1], iconSize[2])
+            ImGui.EndGroup()
         else
             DrawPlainListButton(sectionName, key, index, iconSize)
         end
@@ -466,6 +486,12 @@ local function DrawSpellIconOrButton(sectionName, key, index)
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
             selectedListItem = {key, index}
             selectedUpgrade = nil
+        elseif ImGui.IsItemHovered() and ImGui.IsMouseDown(ImGuiMouseButton.Left) and type(index) == 'number' then
+            if ImGui.BeginDragDropSource() then
+                ImGui.SetDragDropPayload("ListBtn", index)
+                ImGui.Button(index..'##'..sectionName..key, iconSize[1], iconSize[2])
+                ImGui.EndDragDropSource()
+            end
         end
         -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index)
@@ -473,6 +499,16 @@ local function DrawSpellIconOrButton(sectionName, key, index)
         -- No INI value assigned yet for this key
         DrawPlainListButton(sectionName, key, index, iconSize)
         DrawSpellPicker(sectionName, key, index)
+    end
+    if ImGui.BeginDragDropTarget() then
+        local payload = ImGui.AcceptDragDropPayload("ListBtn")
+        if payload ~= nil then
+            local num = payload.Data;
+            -- swap the list entries
+            globals.Config[sectionName][key..index], globals.Config[sectionName][key..num] = globals.Config[sectionName][key..num], globals.Config[sectionName][key..index]
+            globals.Config[sectionName][key..'Cond'..index], globals.Config[sectionName][key..'Cond'..num] = globals.Config[sectionName][key..'Cond'..num], globals.Config[sectionName][key..'Cond'..index]
+        end
+        ImGui.EndDragDropTarget()
     end
 end
 
@@ -499,18 +535,22 @@ local function DrawList(sectionName, key, value)
         size = value['Max']
     end
     ImGui.PopItemWidth()
-    local _,yOffset = ImGui.GetCursorPos()
+    local xOffset,yOffset = ImGui.GetCursorPos()
     local avail = ImGui.GetContentRegionAvail()
     local iconsPerRow = math.floor(avail/38)
     if iconsPerRow == 0 then iconsPerRow = 1 end
     for i=1,size do
         local offsetMod = math.floor((i-1)/iconsPerRow)
-        ImGui.SetCursorPosY(yOffset+(34*offsetMod))
+        ImGui.SetCursorPosY(yOffset+(36*offsetMod))
         DrawSpellIconOrButton(sectionName, key, i)
         if i%iconsPerRow ~= 0 and i < size then
-            ImGui.SameLine()
+            -- Some silliness instead of sameline due to the offset changes for red frames around missing abilities in list items
+            -- Just let it be
+            ImGui.SetCursorPosX(xOffset+(30*(i%iconsPerRow))+(6*(i%iconsPerRow)))
+            ImGui.SetCursorPosY(yOffset)
         end
     end
+    ImGui.SetCursorPosY(yOffset+38*(math.floor((size-1)/iconsPerRow)+1))
     globals.Config[sectionName][key..'Size'] = size
 end
 
