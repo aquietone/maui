@@ -107,12 +107,14 @@ function LIP.save(fileName, data, schema)
 						-- If the property is a list, like XYZ1, XYZ2, then iterator over XYZSize, writing XYZ# and XYZCond#
 						if v['Type'] == 'LIST' then
 							contents = contents .. ('%s=%s\n'):format(k..'Size', tostring(data[sectionKey][k..'Size']));
-							for i=1,data[sectionKey][k..'Size'] do
-								if data[sectionKey][k..tostring(i)] ~= nil then
-									contents = WriteKV(contents, k..tostring(i), data[sectionKey][k..tostring(i)])
-								end
-								if data[sectionKey][k..'Cond'..tostring(i)] ~= nil then
-									contents = WriteKV(contents, k..'Cond'..tostring(i), data[sectionKey][k..'Cond'..tostring(i)])
+							if data[sectionKey][k..'Size'] then
+								for i=1,data[sectionKey][k..'Size'] do
+									if data[sectionKey][k..tostring(i)] ~= nil then
+										contents = WriteKV(contents, k..tostring(i), data[sectionKey][k..tostring(i)])
+									end
+									if data[sectionKey][k..'Cond'..tostring(i)] ~= nil then
+										contents = WriteKV(contents, k..'Cond'..tostring(i), data[sectionKey][k..'Cond'..tostring(i)])
+									end
 								end
 							end
 						else
