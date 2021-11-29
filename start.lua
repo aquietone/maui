@@ -391,11 +391,21 @@ end
 
 local function DrawPlainListButton(sectionName, key, listIdx, iconSize)
     -- INI value is set to non-spell/item
-    if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) and type(listIdx) == 'number' then
-        selectedListItem = {key, listIdx}
-        selectedUpgrade = nil
+    if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
+        if type(listIdx) == 'number' then
+            if mq.TLO.Cursor() then
+                globals.Config[sectionName][key..listIdx] = mq.TLO.Cursor.Name()
+            else
+                selectedListItem = {key, listIdx}
+                selectedUpgrade = nil
+            end
+        else
+            if mq.TLO.Cursor() then
+                globals.Config[sectionName][key] = mq.TLO.Cursor.Name()
+            end
+        end
     elseif type(listIdx) == 'number' then
-        if ImGui.BeginDragDropSource() then
+        if not mq.TLO.Cursor() and ImGui.BeginDragDropSource() then
             ImGui.SetDragDropPayload("ListBtn", listIdx)
             ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2])
             ImGui.EndDragDropSource()
@@ -483,11 +493,24 @@ local function DrawSpellIconOrButton(sectionName, key, index)
         end
         DrawTooltip(iniValue)
         -- Handle clicks on spell icon animations that aren't buttons
-        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
-            selectedListItem = {key, index}
-            selectedUpgrade = nil
+        if ImGui.BeginDragDropTarget() then
+            local payload = ImGui.AcceptDragDropPayload("ListBtn")
+            if payload ~= nil then
+                local num = payload.Data;
+                -- swap the list entries
+                globals.Config[sectionName][key..index], globals.Config[sectionName][key..num] = globals.Config[sectionName][key..num], globals.Config[sectionName][key..index]
+                globals.Config[sectionName][key..'Cond'..index], globals.Config[sectionName][key..'Cond'..num] = globals.Config[sectionName][key..'Cond'..num], globals.Config[sectionName][key..'Cond'..index]
+            end
+            ImGui.EndDragDropTarget()
+        elseif ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
+            if mq.TLO.Cursor() then
+                globals.Config[sectionName][key..index] = mq.TLO.Cursor.Name()
+            else
+                selectedListItem = {key, index}
+                selectedUpgrade = nil
+            end
         elseif ImGui.IsItemHovered() and ImGui.IsMouseDown(ImGuiMouseButton.Left) and type(index) == 'number' then
-            if ImGui.BeginDragDropSource() then
+            if not mq.TLO.Cursor() and ImGui.BeginDragDropSource() then
                 ImGui.SetDragDropPayload("ListBtn", index)
                 ImGui.Button(index..'##'..sectionName..key, iconSize[1], iconSize[2])
                 ImGui.EndDragDropSource()
@@ -499,16 +522,16 @@ local function DrawSpellIconOrButton(sectionName, key, index)
         -- No INI value assigned yet for this key
         DrawPlainListButton(sectionName, key, index, iconSize)
         DrawSpellPicker(sectionName, key, index)
-    end
-    if ImGui.BeginDragDropTarget() then
-        local payload = ImGui.AcceptDragDropPayload("ListBtn")
-        if payload ~= nil then
-            local num = payload.Data;
-            -- swap the list entries
-            globals.Config[sectionName][key..index], globals.Config[sectionName][key..num] = globals.Config[sectionName][key..num], globals.Config[sectionName][key..index]
-            globals.Config[sectionName][key..'Cond'..index], globals.Config[sectionName][key..'Cond'..num] = globals.Config[sectionName][key..'Cond'..num], globals.Config[sectionName][key..'Cond'..index]
+        if ImGui.BeginDragDropTarget() then
+            local payload = ImGui.AcceptDragDropPayload("ListBtn")
+            if payload ~= nil then
+                local num = payload.Data;
+                -- swap the list entries
+                globals.Config[sectionName][key..index], globals.Config[sectionName][key..num] = globals.Config[sectionName][key..num], globals.Config[sectionName][key..index]
+                globals.Config[sectionName][key..'Cond'..index], globals.Config[sectionName][key..'Cond'..num] = globals.Config[sectionName][key..'Cond'..num], globals.Config[sectionName][key..'Cond'..index]
+            end
+            ImGui.EndDragDropTarget()
         end
-        ImGui.EndDragDropTarget()
     end
 end
 
@@ -907,6 +930,24 @@ local function DrawWindowHeaderSettings()
     ImGui.Separator()
 end
 
+-- Thanks coldblooded!
+local EQ_ICON_OFFSET = 500
+local ICON_WIDTH = 40
+local ICON_HEIGHT = 40
+-- If there is an item on the cursor, display it.
+local function display_item_on_cursor()
+    if mq.TLO.Cursor() then
+        local cursor_item = mq.TLO.Cursor -- this will be an MQ item, so don't forget to use () on the members!
+        local mouse_x, mouse_y = ImGui.GetMousePos()
+        local window_x, window_y = ImGui.GetWindowPos()
+        local icon_x = mouse_x - window_x + 10
+        local icon_y = mouse_y - window_y + 10
+        ImGui.SetCursorPos(icon_x, icon_y)
+        animItems:SetTextureCell(cursor_item.Icon() - EQ_ICON_OFFSET)
+        ImGui.DrawTextureAnimation(animItems, ICON_WIDTH, ICON_HEIGHT)
+    end
+end
+
 local MAUI = function()
     open, shouldDrawUI = ImGui.Begin('MAUI (v'..globals.Version..')###MuleAssist', open)
     if shouldDrawUI then
@@ -919,6 +960,7 @@ local MAUI = function()
         end
         DrawWindowHeaderSettings()
         DrawWindowPanels()
+        display_item_on_cursor()
     end
     ImGui.End()
     if not open then terminate = true end
