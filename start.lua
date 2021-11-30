@@ -37,6 +37,15 @@ globals.MyName = mq.TLO.Me.CleanName()
 globals.MyLevel = mq.TLO.Me.Level()
 globals.MyClass = mq.TLO.Me.Class.ShortName():lower()
 
+globals.MAUI_INI = mq.configDir..'/maui.ini'
+local maui_ini_key = globals.MyServer..'_'..globals.MyName
+if utils.FileExists(globals.MAUI_INI) then
+    globals.MAUI_Config = LIP.load(globals.MAUI_INI, false)
+end
+if not globals.MAUI_Config or not globals.MAUI_Config[maui_ini_key] or not globals.MAUI_Config[maui_ini_key]['StartCommand'] then
+    globals.MAUI_Config = {[maui_ini_key] = {['StartCommand'] = globals.Schema['StartCommand'],}}
+end
+
 -- Storage for spell/AA/disc picker
 local spells, altAbilities, discs = {categories={}},{},{}
 
@@ -45,6 +54,18 @@ local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, I
 --local customSections = require('ma.addons.'..globals.CurrentSchema)
 local ok, customSections = pcall(require, 'ma.addons.'..globals.CurrentSchema)
 if not ok then customSections = nil end
+
+local function SaveMAUIConfig()
+    -- Reload the maui.ini before saving to try and prevent writing stale data
+    local tmpStartCommand = globals.MAUI_Config[maui_ini_key]['StartCommand']
+    if utils.FileExists(globals.MAUI_INI) then
+        globals.MAUI_Config = LIP.load(globals.MAUI_INI, false)
+    else
+        globals.MAUI_Config = {}
+    end
+    globals.MAUI_Config[maui_ini_key] = {['StartCommand'] = tmpStartCommand}
+    LIP.save_simple(globals.MAUI_INI, globals.MAUI_Config)
+end
 
 local function Save()
     -- Set "NULL" string values to nil so they aren't saved
@@ -62,6 +83,7 @@ local function Save()
         end
     end
     LIP.save(mq.configDir..'/'..globals.INIFile, globals.Config, globals.Schema)
+    SaveMAUIConfig()
 end
 
 -- Ability menu initializers
@@ -922,10 +944,25 @@ local function DrawWindowHeaderSettings()
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(350)
-    globals.Schema['StartCommand'],_ = ImGui.InputText('##StartCommand', globals.Schema['StartCommand'])
+    globals.MAUI_Config[maui_ini_key]['StartCommand'],_ = ImGui.InputText('##StartCommand', globals.MAUI_Config[maui_ini_key]['StartCommand'])
     ImGui.SameLine()
     if ImGui.Button('Start Macro') then
-        mq.cmd(globals.Schema['StartCommand'])
+        mq.cmd(globals.MAUI_Config[maui_ini_key]['StartCommand'])
+        SaveMAUIConfig()
+    end
+    ImGui.SameLine()
+    if ImGui.Button('End') then
+        mq.cmd('/end')
+    end
+    ImGui.SameLine()
+    if mq.TLO.Macro.Paused() then
+        if ImGui.Button('Resume') then
+            mq.cmd('/mqp off')
+        end
+    else
+        if ImGui.Button('Pause') then
+            mq.cmd('/mqp on')
+        end
     end
     ImGui.Separator()
 end
@@ -954,6 +991,8 @@ local MAUI = function()
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
         if initialRun then
             if ImGui.GetWindowHeight() == 38 and ImGui.GetWindowWidth() == 32 then
+                ImGui.SetWindowSize(727,487)
+            elseif ImGui.GetWindowHeight() == 500 and ImGui.GetWindowWidth() == 500 then
                 ImGui.SetWindowSize(727,487)
             end
             initialRun = false

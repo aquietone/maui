@@ -1,7 +1,7 @@
 local schemas = {'ma'}--, 'ka',}
 
 local globals = {
-    Version = '0.7.2',
+    Version = '0.7.3',
     INIFile = nil, -- file name of character INI to load
     INIFileContents = nil, -- raw file contents for raw INI tab
     Config = nil, -- lua table version of INI content
@@ -11,7 +11,9 @@ local globals = {
     MyClass = nil, -- the class of the character running MAUI,
     Schemas = schemas, -- the available macro schemas which MAUI supports
     CurrentSchema = nil, -- the name of the current macro schema being used
-    Schema = nil, -- the loaded schema
+    Schema = nil, -- the loaded schema,
+    MAUI_INI = nil,
+    MAUI_Config = nil,
 }
 
 return globals

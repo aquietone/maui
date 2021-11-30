@@ -1,3 +1,6 @@
+0.7.3
+- Add end and pause/resume buttons
+- Persist Start Command to new `configDir/maui.ini` for each character
 0.7.2
 - Fix writing INI when missing size property from INI
 0.7.1
