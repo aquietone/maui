@@ -37,8 +37,8 @@ globals.MyName = mq.TLO.Me.CleanName()
 globals.MyLevel = mq.TLO.Me.Level()
 globals.MyClass = mq.TLO.Me.Class.ShortName():lower()
 
-globals.MAUI_INI = mq.configDir..'/maui.ini'
-local maui_ini_key = globals.MyServer..'_'..globals.MyName
+globals.MAUI_INI = ('%s/%s_%s.ini'):format(mq.configDir, globals.MyServer, globals.MyName)
+local maui_ini_key = 'MAUI'
 if utils.FileExists(globals.MAUI_INI) then
     globals.MAUI_Config = LIP.load(globals.MAUI_INI, false)
 end
