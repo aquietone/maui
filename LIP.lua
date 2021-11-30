@@ -144,4 +144,28 @@ function LIP.save(fileName, data, schema)
 	file:close();
 end
 
+--- Saves all the data from a table to an INI file.
+--@param fileName The name of the INI file to fill. [string]
+--@param data The table containing all the data to store. [table]
+function LIP.save_simple(fileName, data)
+	assert(type(fileName) == 'string', 'Parameter "fileName" must be a string.');
+	assert(type(data) == 'table', 'Parameter "data" must be a table.');
+	local file = assert(io.open(fileName, 'w+b'), 'Error loading file :' .. fileName);
+	local contents = '';
+	for section, param in pairs(data) do
+		contents = contents .. ('[%s]\n'):format(section);
+		-- sort the keys before writing the file
+		local keys = {}
+		for k, v in pairs(param) do table.insert(keys, k) end
+		table.sort(keys)
+
+		for _, k in ipairs(keys) do
+			contents = contents .. ('%s=%s\n'):format(k, tostring(param[k]));
+		end
+		contents = contents .. '\n';
+	end
+	file:write(contents);
+	file:close();
+end
+
 return LIP;
