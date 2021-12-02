@@ -1,3 +1,7 @@
+0.7.4
+- Add /maui [show|hide]. The window X button will no longer end the script.
+- Persist INI File name in MAUI character settings
+- Auto-add .ini to input filenames if someone leaves them off
 0.7.3
 - Add end and pause/resume buttons
 - Persist Start Command to `configDir/server_Charactername.ini` for each character under `[MAUI]` section
