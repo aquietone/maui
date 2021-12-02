@@ -218,6 +218,9 @@ local function DrawImportKAINI()
     ImportINIFile = ImGui.InputText('Import INI File Name', ImportINIFile)
     if ImGui.Button('Import INI') then
         ImportRan = true
+        if ImportINIFile:sub(-string.len('.ini')) ~= '.ini' then
+            ImportINIFile = ImportINIFile .. '.ini'
+        end
         if utils.FileExists(mq.configDir..'/'..ImportINIFile) then
             local imported_config = LIP.load(mq.configDir..'/'..ImportINIFile, false)
             print('Importing configuration from KA to MA using INI file: '..ImportINIFile)
