@@ -89,37 +89,34 @@ local function Save()
     SaveMAUIConfig()
 end
 
--- Ability menu initializers
-local function InitSpellTree()
-    -- Sort spells by level
-    local SpellSorter = function(a, b)
-        -- spell level is in spell[1], name in spell[2]
-        if a[1] < b[1] then
-            return false
-        elseif b[1] < a[1] then
-            return true
-        else
-            return false
-        end
+-- Sort spells by level
+local SpellSorter = function(a, b)
+    -- spell level is in spell[1], name in spell[2]
+    if a[1] < b[1] then
+        return false
+    elseif b[1] < a[1] then
+        return true
+    else
+        return false
     end
-    -- Build spell tree for picking spells
-    for spellIter=1,960 do
-        local spell = mq.TLO.Me.Book(spellIter)
-        if spell() then
-            if not spells[spell.Category()] then
-                spells[spell.Category()] = {subcategories={}}
-                table.insert(spells.categories, spell.Category())
-            end
-            if not spells[spell.Category()][spell.Subcategory()] then
-                spells[spell.Category()][spell.Subcategory()] = {}
-                table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
-            end
-            if spell.Level() >= globals.MyLevel-30 then
-                local name = spell.Name():gsub(' Rk%..*', '')
-                table.insert(spells[spell.Category()][spell.Subcategory()], {spell.Level(), name})
-            end
-        end
+end
+
+local function AddSpellToMap(spell)
+    if not spells[spell.Category()] then
+        spells[spell.Category()] = {subcategories={}}
+        table.insert(spells.categories, spell.Category())
     end
+    if not spells[spell.Category()][spell.Subcategory()] then
+        spells[spell.Category()][spell.Subcategory()] = {}
+        table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
+    end
+    if spell.Level() >= globals.MyLevel-30 then
+        local name = spell.Name():gsub(' Rk%..*', '')
+        table.insert(spells[spell.Category()][spell.Subcategory()], {spell.Level(), name})
+    end
+end
+
+local function SortSpellMap()
     -- sort categories and subcategories alphabetically, spells by level
     table.sort(spells.categories)
     for category,subcategories in pairs(spells) do
@@ -132,6 +129,18 @@ local function InitSpellTree()
             end
         end
     end
+end
+
+-- Ability menu initializers
+local function InitSpellTree()
+    -- Build spell tree for picking spells
+    for spellIter=1,960 do
+        local spell = mq.TLO.Me.Book(spellIter)
+        if spell() then
+            AddSpellToMap(spell)
+        end
+    end
+    SortSpellMap()
 end
 
 local function InitAATree()
@@ -200,6 +209,7 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
                 -- TODO: this won't handle spells whos trigger SPA is just the illusion portion
             elseif spell.SPA() then
                 for SPAIdx=1,spell.NumEffects() do
+                    --print(string.format('[%s] .Base: %d, Base2: %d, Max: %d', spell.Name(), spell.Base(SPAIdx)(), spell.Base2(SPAIdx)(), spell.Max(SPAIdx)()))
                     if spell.Base(SPAIdx)() < -1 then
                         if spell.Base(SPAIdx)() < max then
                             max = spell.Base(SPAIdx)()
@@ -350,6 +360,22 @@ local function DrawSelectedSpellUpgradeButton(spell)
     return upgradeValue
 end
 
+local function DrawSelectedSpellDowngradeButton(spell)
+    local upgradeValue = nil
+    -- Avoid finding the upgrade more than once
+    if not selectedUpgrade then
+        selectedUpgrade = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), 0)
+    end
+    -- Upgrade found? display the upgrade button
+    if selectedUpgrade ~= '' and selectedUpgrade ~= spell.Name() then
+        if ImGui.Button('Downgrade Available - '..selectedUpgrade) then
+            upgradeValue = selectedUpgrade
+            selectedUpgrade = nil
+        end
+    end
+    return upgradeValue
+end
+
 local function CheckInputType(key, value, typestring, inputtype)
     if type(value) ~= typestring then
         utils.printf('\arWARNING [%s]: %s value is not a %s: type=%s value=%s\a-x', key, inputtype, typestring, type(value), tostring(value))
@@ -401,6 +427,9 @@ local function DrawSelectedListItem(sectionName, key, value)
     local spell = mq.TLO.Spell(valueParts[1])
     if mq.TLO.Me.Book(spell.RankName())() then
         local upgradeResult = DrawSelectedSpellUpgradeButton(spell)
+        if upgradeResult then valueParts[1] = upgradeResult end
+    elseif spell then
+        local upgradeResult = DrawSelectedSpellDowngradeButton(spell)
         if upgradeResult then valueParts[1] = upgradeResult end
     end
     if valueParts[1] and string.len(valueParts[1]) > 0 then
@@ -1012,7 +1041,7 @@ local MAUI = function()
 end
 
 local function ShowHelp()
-    print('\a-t[\ax\ayMAUI\ax\a-t]\ax Usage: /maui [show|hide]')
+    print('\a-t[\ax\ayMAUI\ax\a-t]\ax Usage: /maui [show|hide|stop]')
 end
 
 local function BindMaui(args)
@@ -1026,7 +1055,22 @@ local function BindMaui(args)
         open = true
     elseif arglist[1] == 'hide' then
         open = false
+    elseif arglist[1] == 'stop' then
+        open = false
+        terminate = true
     end
+end
+
+local function NewSpellMemmed(line, spell)
+    print(string.format('\a-t[\ax\ayMAUI\ax\a-t]\ax New spell memorized, updating spell list. \a-t(\ax\ay%s\ax\a-t)\ax', spell))
+    -- Build spell tree for picking spells
+    local spellNum = mq.TLO.Me.Book(spell)
+    local spell = mq.TLO.Me.Book(spellNum)
+    if spell() then
+        AddSpellToMap(spell)
+    end
+
+    SortSpellMap()
 end
 
 -- Load INI into table as well as raw content
@@ -1049,11 +1093,14 @@ coroutine.resume(initCo)
 
 mq.bind('/maui', BindMaui)
 
+mq.event('NewSpellMemmed', '#*#You have finished scribing #1#.', NewSpellMemmed)
+
 mq.imgui.init('MuleAssist', MAUI)
 
 while not terminate do
     if coroutine.status(initCo) == 'suspended' then
         coroutine.resume(initCo)
     end
+    mq.doevents()
     mq.delay(20)
 end
