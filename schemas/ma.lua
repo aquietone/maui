@@ -4,7 +4,13 @@ local schema = {
             ['nolevel'] = 'MuleAssist_%s_%s.ini',
             ['default'] = 'nolevel',
     },
-    StartCommand = '/mac muleassist assist ${Group.MainAssist}',
+    StartCommands = {
+        '/mac muleassist',
+        '/mac muleassist assist ${Group.MainAssist}',
+        '/mac muleassist tank',
+        '/mac muleassist puller ${Group.MainAssist}',
+        '/mac muleassist pullertank',
+    },
     -- Array For tab and INI ordering purposes
     Sections = {
         'General',
