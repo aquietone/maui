@@ -1,3 +1,8 @@
+0.8.1
+- Memorize spell button added to right click menu on abilities.
+- A couple of small schema fixes
+0.8.0
+- Add dropdown menu of preconfigured macro start commands
 0.7.5
 - Add spell downgrade button
 - Add event to update spell list when memorizing new spells
