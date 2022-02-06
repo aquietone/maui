@@ -10,6 +10,7 @@ local schema = {
         '/mac muleassist tank',
         '/mac muleassist puller ${Group.MainAssist}',
         '/mac muleassist pullertank',
+        '/mac muleassist hunter',
     },
     -- Array For tab and INI ordering purposes
     Sections = {
@@ -349,7 +350,9 @@ local schema = {
                 Tooltip='Specify the name of the PowerSource you want to maintain being equipped and active in your PowerSource inventory slot, as well as destroy/remove used powersources. You can maintain the PowerSource by treating it as a summoned item.',
             },
             BegOn={
-                Type='SWITCH',
+                Type='NUMBER',
+                Min=0,
+                Max=2,
                 Tooltip='0=Off/1=On - Toggles the beg buff feature.',
             },
             BegPermission={
@@ -607,10 +610,8 @@ local schema = {
                 Tooltip='Only used with Advanced Path. This feature will use the paths waypoint, not the Pullers, when checking mobs MaxZRange.',
             },
             PullArcWidth={
-                Type='NUMBER',
-                Min=0,
-                Max=360,
-                Tooltip='The width in degrees on the compass.',
+                Type='STRING',
+                Tooltip='The width in degrees on the compass and optionally the heading. Ex. "180 n".',
             },
             -- CheckForMemblurredMobsInCamp int (0)
             -- PullCond string (TRUE)
