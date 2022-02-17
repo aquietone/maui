@@ -35,6 +35,7 @@ local function DrawRawINIEditTab()
     if ImGui.Button('Save Raw INI##rawini') then
         utils.WriteRawINIFile(globals.INIFileContents)
         globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+        globals.INILoadError = ''
     end
     local x,y = ImGui.GetContentRegionAvail()
     globals.INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", globals.INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)

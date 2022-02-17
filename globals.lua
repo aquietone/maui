@@ -1,9 +1,10 @@
-local schemas = {'ma'}--, 'ka',}
+local schemas = {'ma'}
 
 local globals = {
-    Version = '0.8.1',
+    Version = '0.8.2',
     INIFile = nil, -- file name of character INI to load
     INIFileContents = nil, -- raw file contents for raw INI tab
+    INILoadError = '', -- store error message for INI load failures
     Config = nil, -- lua table version of INI content
     MyServer = nil, -- the server of the character running MAUI
     NyName = nil, -- the name of the character running MAUI
