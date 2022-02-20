@@ -1,3 +1,8 @@
+0.9.0
+- Add file selection dialog for choosing INI files
+- Caching for TLO lookups to improve performance
+- Add a red theme option. It doesn't persist the setting, just for fun
+- Fix up some stuff being marked as red/missing
 0.8.4
 - add a maui.lua at top level so you can `/lua run maui`
 0.8.3

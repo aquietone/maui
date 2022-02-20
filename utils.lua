@@ -1,6 +1,6 @@
 --- @type mq
-local mq = require 'mq'
-local globals = require 'ma.globals'
+local mq = require('mq')
+local globals = require('ma.globals')
 
 local utils = {}
 

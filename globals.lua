@@ -1,7 +1,7 @@
 local schemas = {'ma'}--, 'ka',}
 
 local globals = {
-    Version = '0.8.4',
+    Version = '0.9.0',
     INIFile = nil, -- file name of character INI to load
     INIFileContents = nil, -- raw file contents for raw INI tab
     INILoadError = '', -- store error message for INI load failures
@@ -15,6 +15,7 @@ local globals = {
     Schema = nil, -- the loaded schema,
     MAUI_INI = nil,
     MAUI_Config = nil,
+    Theme = 'default',
 }
 
 return globals
