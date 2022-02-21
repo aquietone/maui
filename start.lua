@@ -66,7 +66,7 @@ end
 
 -- Storage for spell/AA/disc picker
 local spells, altAbilities, discs = {categories={}},{types={}},{categories={}}
-local aatypes = {'General','Archtype','Class','Special'}
+local aatypes = {'General','Archtype','Class','Special','Focus','Merc'}
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
 
@@ -366,21 +366,23 @@ local function DrawSpellPicker(sectionName, key, index)
         -- Top level 'AAs' menu item
         if sectionName ~= 'MySpells' and #altAbilities.types > 0 then
             if ImGui.BeginMenu('Alt Abilities##rcmenu'..sectionName..key) then
-                for _,type in ipairs(altAbilities.types) do
-                    local menuHeight = -1
-                    if #altAbilities[type] > 25 then
-                        menuHeight = ImGui.GetTextLineHeight()*25
-                    end
-                    ImGui.SetNextWindowSize(250, menuHeight)
-                    if ImGui.BeginMenu(type..'##aamenu'..sectionName..key..type) then
-                        for _,altAbility in ipairs(altAbilities[type]) do
-                            SetSpellTextColor(altAbility[2])
-                            if ImGui.MenuItem(altAbility[1]..'##aa'..sectionName..key) then
-                                valueParts[1] = altAbility[1]
-                            end
-                            ImGui.PopStyleColor()
+                for _,type in ipairs(aatypes) do
+                    if altAbilities[type] then
+                        local menuHeight = -1
+                        if #altAbilities[type] > 25 then
+                            menuHeight = ImGui.GetTextLineHeight()*25
                         end
-                        ImGui.EndMenu()
+                        ImGui.SetNextWindowSize(250, menuHeight)
+                        if ImGui.BeginMenu(type..'##aamenu'..sectionName..key..type) then
+                            for _,altAbility in ipairs(altAbilities[type]) do
+                                SetSpellTextColor(altAbility[2])
+                                if ImGui.MenuItem(altAbility[1]..'##aa'..sectionName..key) then
+                                    valueParts[1] = altAbility[1]
+                                end
+                                ImGui.PopStyleColor()
+                            end
+                            ImGui.EndMenu()
+                        end
                     end
                 end
                 ImGui.EndMenu()
@@ -420,14 +422,16 @@ local function DrawSpellPicker(sectionName, key, index)
         end
         if valueParts[1] then
             local rankname = tloCache:get(valueParts[1]..'.rankname', function() return mq.TLO.Spell(valueParts[1]).RankName() end)
-            local bookidx = tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end)
-            if bookidx then
-                if ImGui.MenuItem('Memorize Spell') then
-                    for i=1,13 do
-                        if not mq.TLO.Me.Gem(i)() then
-                            memspell = valueParts[1]
-                            memgem = i
-                            break
+            if rankname then
+                local bookidx = tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end)
+                if bookidx then
+                    if ImGui.MenuItem('Memorize Spell') then
+                        for i=1,13 do
+                            if not mq.TLO.Me.Gem(i)() then
+                                memspell = valueParts[1]
+                                memgem = i
+                                break
+                            end
                         end
                     end
                 end
