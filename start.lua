@@ -65,7 +65,8 @@ if not selected_start_command then
 end
 
 -- Storage for spell/AA/disc picker
-local spells, altAbilities, discs = {categories={}},{types={'General','Archtype','Class','Special'}},{categories={}}
+local spells, altAbilities, discs = {categories={}},{types={}},{categories={}}
+local aatypes = {'General','Archtype','Class','Special'}
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
 
@@ -164,9 +165,10 @@ local function InitSpellTree()
 end
 
 local function AddAAToMap(aa)
-    local type = altAbilities.types[aa.Type()]
+    local type = aatypes[aa.Type()]
     if not altAbilities[type] then
         altAbilities[type] = {}
+        table.insert(altAbilities.types, type)
     end
     table.insert(altAbilities[type], {aa.Name(),aa.Spell.Name()})
 end
@@ -177,6 +179,11 @@ local function InitAATree()
         local aa = mq.TLO.Me.AltAbility(aaIter)
         if aa.Spell() then
             AddAAToMap(aa)
+        end
+    end
+    for _,type in ipairs(altAbilities.types) do
+        if altAbilities[type] then
+            table.sort(altAbilities[type], function(a,b) return a[1] < b[1] end)
         end
     end
 end
@@ -200,7 +207,9 @@ local function InitDiscTree()
     local discIter = 1
     repeat
         local disc = mq.TLO.Me.CombatAbility(discIter)
-        AddDiscToMap(disc)
+        if disc() then
+            AddDiscToMap(disc)
+        end
         discIter = discIter + 1
     until mq.TLO.Me.CombatAbility(discIter)() == nil
     SortMap(discs)
@@ -1242,6 +1251,16 @@ local MAUI = function()
     if used_theme then pop_styles() end
 end
 
+local function CheckGameState()
+    if mq.TLO.MacroQuest.GameState() ~= 'INGAME' then
+        print('\arNot in game, stopping MAUI.\ax')
+        open = false
+        shouldDrawUI = false
+        mq.imgui.destroy('MuleAssist')
+        mq.exit()
+    end
+end
+
 local function ShowHelp()
     print('\a-t[\ax\ayMAUI\ax\a-t]\ax Usage: /maui [show|hide|stop]')
 end
@@ -1294,6 +1313,7 @@ mq.imgui.init('MuleAssist', MAUI)
 
 local init_done = false
 while not terminate do
+    CheckGameState()
     mq.doevents()
     if not init_done then
         InitSpellTree()
