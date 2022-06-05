@@ -14,6 +14,7 @@ local terminate = false
 -- value for the selected list item would interfere when multiple lists are displayed.
 -- So, set individual selected items for up to 5 list properties in a section.
 local selected = {0,0,0,0,0}
+local selectedUpgrade = {}
 
 local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
 local INIFile = nil
@@ -138,6 +139,48 @@ local InitDiscTree = function()
     table.sort(discs)
 end
 
+local GetBestInSpell = function(targetType, subCat, numEffects)
+    local max = 0
+    local maxName = ''
+    for i=1,900 do
+        local valid = true
+        local spell = mq.TLO.Me.Book(i)
+        if not spell.ID() then
+            valid = false
+        elseif spell.Subcategory() ~= subCat then
+            valid = false
+        elseif spell.TargetType() ~= targetType then
+            valid = false
+        elseif spell.NumEffects() ~= numEffects then
+            valid = false
+        end
+        if valid then
+            if spell.HasSPA(470)() or spell.HasSPA(374)() or spell.HasSPA(340)() then
+                --[[for eIdx=1,spell.NumEffects() do
+                    for SPAIdx=1,spell.Trigger(eIdx).NumEffects() do
+
+                    end
+                end--]]
+            elseif spell.SPA() then
+                for SPAIdx=1,spell.NumEffects() do
+                    if spell.Base(SPAIdx)() < -1 then
+                        if spell.Base(SPAIdx)() < max then
+                            max = spell.Base(SPAIdx)()
+                            maxName = spell.Name():gsub(' Rk%..*', '')
+                        end
+                    else
+                        if spell.Base(SPAIdx)() > max then
+                            max = spell.Base(SPAIdx)()
+                            maxName = spell.Name():gsub(' Rk%..*', '')
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return maxName
+end
+
 -- ImGui functions
 
 local SetSpellTextColor = function(spell)
@@ -234,6 +277,19 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
         ImGui.SetCursorPosX(175)
         config[sectionName][key..'Cond'..selected[selectedIdx]] = ImGui.InputText('##condition'..sectionName..key..selected[selectedIdx], config[sectionName][key..'Cond'..selected[selectedIdx]])
     end
+    local iniValueParts = Split(config[sectionName][key..selected[selectedIdx]])
+    local spell = mq.TLO.Spell(iniValueParts[1])
+    if spell then
+        if not selectedUpgrade[selectedIdx] then
+            selectedUpgrade[selectedIdx] = GetBestInSpell(spell.TargetType(), spell.Subcategory(), spell.NumEffects())
+        end
+        if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
+            if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
+                config[sectionName][key..selected[selectedIdx]] = selectedUpgrade[selectedIdx]
+                selectedUpgrade[selectedIdx] = nil
+            end
+        end
+    end
     ImGui.Separator()
 end
 
@@ -253,7 +309,10 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
         else
             -- INI value is set to non-spell/item
             if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-                if selectedIdx >= 0 then selected[selectedIdx] = index end
+                if selectedIdx >= 0 then
+                    selected[selectedIdx] = index
+                    selectedUpgrade[selectedIdx] = nil
+                end
             end
         end
         if ImGui.IsItemHovered() then
@@ -264,13 +323,19 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
             ImGui.EndTooltip()
         end
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            if selectedIdx >= 0 then selected[selectedIdx] = index end
+            if selectedIdx >= 0 then 
+                selected[selectedIdx] = index
+                selectedUpgrade[selectedIdx] = nil
+            end
         end
         -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index)
     else
         if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
-            if selectedIdx >= 0 then selected[selectedIdx] = index end
+            if selectedIdx >= 0 then
+                selected[selectedIdx] = index
+                selectedUpgrade[selectedIdx] = nil
+            end
         end
         DrawSpellPicker(sectionName, key, index)
     end
@@ -293,6 +358,7 @@ local DrawList = function(sectionName, key, value, selectedIdx)
     end
     if config[sectionName][key..'Size'] < selected[selectedIdx] then
         selected[selectedIdx] = 0
+        selectedUpgrade[selectedIdx] = nil
     end
     ImGui.PopItemWidth()
     for i=1,config[sectionName][key..'Size'] do
@@ -346,6 +412,33 @@ local DrawProperty = function(sectionName, key, value)
         ImGui.PushItemWidth(350)
         config[sectionName][key] = ImGui.InputText('##'..sectionName..key, tostring(config[sectionName][key]))
         ImGui.PopItemWidth()
+    elseif value['Type'] == 'MULTIPART' then
+        local parts = Split(config[sectionName][key])
+        for partIdx,part in ipairs(value['Parts']) do
+            if part['Type'] == 'SWITCH' then
+                ImGui.Text(part['Name']..': ')
+                ImGui.SameLine()
+                parts[partIdx] = ImGui.Checkbox('##'..key, InitCheckBoxValue(tonumber(parts[partIdx])))
+                if parts[partIdx] then parts[partIdx] = '1' else parts[partIdx] = '0' end
+            elseif part['Type'] == 'NUMBER' then
+                if not parts[partIdx] or parts[partIdx] == 'NULL' then parts[partIdx] = 0 end
+                ImGui.Text(part['Name']..': ')
+                ImGui.SameLine()
+                ImGui.PushItemWidth(100)
+                parts[partIdx] = ImGui.InputInt('##'..sectionName..key, tonumber(parts[partIdx]))
+                ImGui.PopItemWidth()
+                if part['Min'] and parts[partIdx] < part['Min'] then
+                    parts[partIdx] = part['Min']
+                elseif part['Max'] and parts[partIdx] > part['Max'] then
+                    parts[partIdx] = part['Max']
+                end
+                parts[partIdx] = tostring(parts[partIdx])
+            end
+            config[sectionName][key] = table.concat(parts, '|')
+            if partIdx == 1 then
+                ImGui.SameLine()
+            end
+        end
     end
 end
 
