@@ -63,7 +63,7 @@ local function SaveMAUIConfig()
     else
         globals.MAUI_Config = {}
     end
-    globals.MAUI_Config[maui_ini_key] = {['StartCommand'] = tmpStartCommand}
+    globals.MAUI_Config[maui_ini_key] = {['StartCommand'] = tmpStartCommand, ['INIFile'] = globals.INIFile}
     LIP.save_simple(globals.MAUI_INI, globals.MAUI_Config)
 end
 
@@ -81,6 +81,9 @@ local function Save()
                 globals.Config[sectionName][key] = nil
             end
         end
+    end
+    if globals.INIFile:sub(-string.len('.ini')) ~= '.ini' then
+        globals.INIFile = globals.INIFile .. '.ini'
     end
     LIP.save(mq.configDir..'/'..globals.INIFile, globals.Config, globals.Schema)
     SaveMAUIConfig()
@@ -936,9 +939,12 @@ local function DrawWindowHeaderSettings()
     end
     ImGui.SameLine()
     if ImGui.Button('Reload INI') then
+        if globals.INIFile:sub(-string.len('.ini')) ~= '.ini' then
+            globals.INIFile = globals.INIFile .. '.ini'
+        end
         globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
     end
-    
+
     ImGui.Separator()
     ImGui.Text('Start Command: ')
     ImGui.SameLine()
@@ -986,6 +992,7 @@ local function display_item_on_cursor()
 end
 
 local MAUI = function()
+    if not open then return end
     open, shouldDrawUI = ImGui.Begin('MAUI (v'..globals.Version..')###MuleAssist', open)
     if shouldDrawUI then
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
@@ -1002,11 +1009,28 @@ local MAUI = function()
         display_item_on_cursor()
     end
     ImGui.End()
-    if not open then terminate = true end
+end
+
+local function ShowHelp()
+    print('\a-t[\ax\ayMAUI\ax\a-t]\ax Usage: /maui [show|hide]')
+end
+
+local function BindMaui(args)
+    if not args then
+        ShowHelp()
+    end
+    local arglist = {args}
+    if #arglist > 1 then
+        ShowHelp()
+    elseif arglist[1] == 'show' then
+        open = true
+    elseif arglist[1] == 'hide' then
+        open = false
+    end
 end
 
 -- Load INI into table as well as raw content
-globals.INIFile = utils.FindINIFile()
+globals.INIFile = globals.MAUI_Config['INIFile'] or utils.FindINIFile()
 if globals.INIFile then
     globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
     globals.INIFileContents = utils.ReadRawINIFile()
@@ -1022,6 +1046,8 @@ local initCo = coroutine.create(function()
     InitDiscTree()
 end)
 coroutine.resume(initCo)
+
+mq.bind('/maui', BindMaui)
 
 mq.imgui.init('MuleAssist', MAUI)
 
