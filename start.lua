@@ -815,17 +815,19 @@ end
 
 local radioValue = 1
 local function DrawWindowHeaderSettings()
-    for idx, schema_kind in ipairs(globals.Schemas) do
-        radioValue,_ = ImGui.RadioButton(schema_kind, radioValue, idx)
-        ImGui.SameLine()
-    end
-    if globals.CurrentSchema ~= globals.Schemas[radioValue] then
-        if not SetSchemaVars(globals.Schemas[radioValue]) then
-            radioValue = 1
+    if #globals.Schemas > 1 then
+        for idx, schema_kind in ipairs(globals.Schemas) do
+            radioValue,_ = ImGui.RadioButton(schema_kind, radioValue, idx)
+            ImGui.SameLine()
         end
+        if globals.CurrentSchema ~= globals.Schemas[radioValue] then
+            if not SetSchemaVars(globals.Schemas[radioValue]) then
+                radioValue = 1
+            end
+        end
+        ImGui.NewLine()
+        ImGui.Separator()
     end
-    ImGui.NewLine()
-    ImGui.Separator()
 
     ImGui.Text('INI File: ')
     ImGui.SameLine()
