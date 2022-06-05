@@ -99,7 +99,8 @@ local InitSpellTree = function()
             table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
         end
         if spell.Level() >= myLevel-30 then
-            table.insert(spells[spell.Category()][spell.Subcategory()], spell.Name())
+            local name = spell.Name():gsub(' Rk%..*', '')
+            table.insert(spells[spell.Category()][spell.Subcategory()], name)
         end
         spellIter = spellIter + 1
     until mq.TLO.Me.Book(spellIter)() == nil
@@ -130,13 +131,40 @@ end
 local InitDiscTree = function()
     -- Build disc tree for picking discs
     repeat
-        table.insert(discs, mq.TLO.Me.CombatAbility(discIter).Name())
+        local name = mq.TLO.Me.CombatAbility(discIter).Name():gsub(' Rk%..*', '')
+        table.insert(discs, name)
         discIter = discIter + 1
     until mq.TLO.Me.CombatAbility(discIter)() == nil
     table.sort(discs)
 end
 
 -- ImGui functions
+
+local SetSpellTextColor = function(spell)
+    local target = mq.TLO.Spell(spell).TargetType()
+    if target == 'Single' or target == 'Line of Sight' or target == 'Undead' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+    elseif target == 'Self' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 0, 1)
+    elseif target == 'Group v2' or target == 'Group v1' or target == 'AE PC v2' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 1, 1)
+    elseif target == 'Beam' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 1, 1)
+    elseif target == 'Targeted AE' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0.5, 0, 1)
+    elseif target == 'PB AE' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 0, 0.5, 1, 1)
+    elseif target == 'Pet' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+    elseif target == 'Pet2' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+    elseif target == 'Free Target' then
+        ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
+    else
+        ImGui.PushStyleColor(ImGuiCol.Text, 1, 1, 1, 1)
+    end
+end
+
 local DrawSpellPicker = function(sectionName, key, index)
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
@@ -150,9 +178,11 @@ local DrawSpellPicker = function(sectionName, key, index)
                         if ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
                             for _,spell in ipairs(spells[category][subcategory]) do
                                 local spellLevel = mq.TLO.Spell(spell).Level()
+                                SetSpellTextColor(spell)
                                 if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
                                     config[sectionName][key..index] = spell
                                 end
+                                ImGui.PopStyleColor()
                             end
                             ImGui.EndMenu()
                         end
