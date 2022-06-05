@@ -24,6 +24,7 @@
 --@author Dynodzzo
 
 local LIP = {};
+local schema = require 'ma.schema'
 
 --- Returns a table containing all the data from the INI file.
 --@param fileName The name of the INI file to parse. [string]
@@ -58,30 +59,6 @@ function LIP.load(fileName)
 	return data;
 end
 
--- Set an ordered list of sections
-local sections = {
-	'General', 
-	'DPS', 
-	'Heals', 
-	'Buffs', 
-	'Melee', 
-	'Burn', 
-	'Mez', 
-	'AE', 
-	'OhShit', 
-	'Pet', 
-	'Pull', 
-	'Aggro', 
-	'Bandolier', 
-	'Cures', 
-	'GoM', 
-	'Merc', 
-	'AFKTools', 
-	'GMail', 
-	'MySpells', 
-	'SpellSet'
-}
-
 local KeySorter = function(a, b)
 	local aNum = tonumber(a:match('%d+'))
 	local bNum = tonumber(b:match('%d+'))
@@ -107,7 +84,7 @@ function LIP.save(fileName, data)
 	local file = assert(io.open(fileName, 'w+b'), 'Error loading file :' .. fileName);
 	local contents = '';
 
-	for _, sectionKey in ipairs(sections) do
+	for _, sectionKey in ipairs(schema.Sections) do
 		if data[sectionKey] and next(data[sectionKey]) ~= nil then
 			contents = contents .. ('[%s]\n'):format(sectionKey);
 			-- sort the keys before writing the file
