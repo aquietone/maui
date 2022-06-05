@@ -3,7 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
-local version = '0.3'
+local version = '0.4'
 
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
@@ -71,14 +71,14 @@ local function JoinStrings(t, sep, start)
 end
 
 local function ReadRawINIFile()
-    local f = io.open(mq.configDir..'\\'..INIFile, 'r')
+    local f = io.open(mq.configDir..'/'..INIFile, 'r')
     local contents = f:read('*a')
     io.close(f)
     return contents
 end
 
 local function WriteRawINIFile(contents)
-    local f = io.open(mq.configDir..'\\'..INIFile, 'w')
+    local f = io.open(mq.configDir..'/'..INIFile, 'w')
     f:write(contents)
     io.close(f)
 end
@@ -89,14 +89,14 @@ local function FileExists(path)
 end
 
 local function FindINIFileName()
-    if FileExists(mq.configDir..'\\'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)) then
+    if FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)) then
         return string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
-    elseif FileExists(mq.configDir..'\\'..string.format('MuleAssist_%s_%s.ini', myServer, myName)) then
+    elseif FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s.ini', myServer, myName)) then
         return string.format('MuleAssist_%s_%s.ini', myServer, myName)
     else
         local fileLevel = myLevel-1
         repeat
-            if FileExists(mq.configDir..'\\'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, fileLevel)) then
+            if FileExists(mq.configDir..'/'..string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, fileLevel)) then
                 return string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, fileLevel)
             end
             fileLevel = fileLevel-1
@@ -131,7 +131,7 @@ local function Save()
             end
         end
     end
-    LIP.save(mq.configDir..'\\'..INIFile, config)
+    LIP.save(mq.configDir..'/'..INIFile, config)
 end
 
 -- Ability menu initializers
@@ -685,22 +685,108 @@ end
 
 local function DrawRawINIEditTab()
     if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-        if FileExists(mq.configDir..'\\'..INIFile) then
+        if FileExists(mq.configDir..'/'..INIFile) then
             INIFileContents = ReadRawINIFile()
         end
     end
     if ImGui.Button('Refresh Raw INI##rawini') then
-        if FileExists(mq.configDir..'\\'..INIFile) then
+        if FileExists(mq.configDir..'/'..INIFile) then
             INIFileContents = ReadRawINIFile()
         end
     end
     ImGui.SameLine()
     if ImGui.Button('Save Raw INI##rawini') then
         WriteRawINIFile(INIFileContents)
-        config = LIP.load(mq.configDir..'\\'..INIFile)
+        config = LIP.load(mq.configDir..'/'..INIFile)
     end
     local x,y = ImGui.GetContentRegionAvail()
     INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
+end
+
+local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
+local LEMONS_INFO_INI = 'Lemons_Info.ini'
+local MA_LISTS = {'FireMobs','ColdMobs','MagicMobs','PoisonMobs','DiseaseMobs','SlowMobs'}
+local selectedList = nil
+local selectedListItem = nil
+local lemons_info = LIP.load(mq.configDir..'/'..LEMONS_INFO_INI, true)
+local function DrawListsTab()
+    ImGui.Text('Select a list below to edit:')
+    ImGui.SameLine()
+    if ImGui.SmallButton('Save Lemons INI') then
+
+    end
+    ImGui.SameLine()
+    if ImGui.SmallButton('Reload Lemons INI') then
+        
+    end
+    if ImGui.BeginTable('ListSelectionTable', 1, TABLE_FLAGS, 0, 150, 0.0) then
+        ImGui.TableSetupColumn('List Name',     0,   -1.0, 1)
+        ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
+        ImGui.TableHeadersRow()
+        local clipper = ImGuiListClipper.new()
+        clipper:Begin(#MA_LISTS)
+        while clipper:Step() do
+            for row_n = clipper.DisplayStart, clipper.DisplayEnd - 1, 1 do
+                local clipName = MA_LISTS[row_n+1]
+                ImGui.PushID(clipName)
+                ImGui.TableNextRow()
+                ImGui.TableNextColumn()
+                local sel = ImGui.Selectable(clipName, selectedList == clipName)
+                if sel then
+                    selectedList = clipName
+                end
+                ImGui.PopID()
+            end
+        end
+        ImGui.EndTable()
+    end
+    if selectedList ~= nil then
+        ImGui.TextColored(1, 1, 0, 1, selectedList)
+        ImGui.SameLine()
+        ImGui.SetCursorPosX(100)
+        if ImGui.SmallButton('Add Entry') then
+
+        end
+        ImGui.SameLine()
+        if ImGui.SmallButton('Remove Selected') then
+
+        end
+        if ImGui.BeginTable('SelectedListTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
+            ImGui.TableSetupColumn('Mob or Zone Short Name',     0,   -1.0, 1)
+            ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
+            ImGui.TableHeadersRow()
+            for key,_ in pairs(lemons_info[selectedList]) do
+                ImGui.TableNextRow()
+                ImGui.TableNextColumn()
+                local sel = ImGui.Selectable(key, selectedListItem == key)
+                if sel then
+                    selectedListItem = key
+                end
+            end
+            ImGui.EndTable()
+        end
+    end
+end
+
+local selectedDebug = 'dps'
+local DEBUG = {'dps','heals','buffs'}
+local debugCaptureTime = '60'
+local function DrawDebugTab()
+    ImGui.Text('Not implemented')
+    if ImGui.BeginCombo('Debug Categories', selectedDebug) then
+        for i,j in ipairs(DEBUG) do
+            if ImGui.Selectable(j, selectedDebug == j) then
+                selectedDebug = j
+            end
+        end
+        ImGui.EndCombo()
+    end
+    debugCaptureTime = ImGui.InputText('Debug Capture Time', debugCaptureTime)
+    if selectedDebug then
+        if ImGui.Button('Debug '..selectedDebug) then
+            mq.cmdf('/writedebug %s %s', selectedDebug, debugCaptureTime)
+        end
+    end
 end
 
 local basepanesize = 150
@@ -737,32 +823,47 @@ local function DrawSplitter(thickness, size0, min_size0)
     ImGui.SetCursorPosY(y)
 end
 
+local customSections = {['Raw INI']=DrawRawINIEditTab, ['Shared Lists']=DrawListsTab, ['Debug']=DrawDebugTab}
 local selectedSection = 'General'
 local function LeftPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("left", lpanesize, y-1, true) then
-        for _,sectionName in ipairs(schema.Sections) do
-            if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
-                local popStyleColor = false
-                if schema[sectionName]['Controls'] and schema[sectionName]['Controls']['On'] then
-                    if not config[sectionName] or not config[sectionName][sectionName..'On'] or config[sectionName][sectionName..'On'] == 0 then
-                        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
-                    else
-                        ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
+        if ImGui.BeginTable('SelectSectionTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
+            ImGui.TableSetupColumn('Section Name',     0,   -1.0, 1)
+            ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
+            ImGui.TableHeadersRow()
+
+            for _,sectionName in ipairs(schema.Sections) do
+                if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
+                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
+                    local popStyleColor = false
+                    if schema[sectionName]['Controls'] and schema[sectionName]['Controls']['On'] then
+                        if not config[sectionName] or not config[sectionName][sectionName..'On'] or config[sectionName][sectionName..'On'] == 0 then
+                            ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+                        else
+                            ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
+                        end
+                        popStyleColor = true
                     end
-                    popStyleColor = true
+                    local sel = ImGui.Selectable(sectionName, selectedSection == sectionName)
+                    if sel and selectedSection ~= sectionName then
+                        selected = {0,0,0,0,0}
+                        selectedSection = sectionName
+                    end
+                    if popStyleColor then ImGui.PopStyleColor() end
                 end
-                local sel = ImGui.Selectable(sectionName, selectedSection == sectionName)
-                if sel and selectedSection ~= sectionName then
-                    selected = {0,0,0,0,0}
-                    selectedSection = sectionName
-                end
-                if popStyleColor then ImGui.PopStyleColor() end
             end
-        end
-        local sel = ImGui.Selectable('Raw INI', selectedSection == 'Raw INI')
-        if sel then
-            selectedSection = 'Raw INI'
+            ImGui.Separator()
+            ImGui.Separator()
+            for section,_ in pairs(customSections) do
+                ImGui.TableNextRow()
+                ImGui.TableNextColumn()
+                if ImGui.Selectable(section, selectedSection == section) then
+                    selectedSection = section
+                end
+            end
+            ImGui.EndTable()
         end
     end
     ImGui.EndChild()
@@ -771,10 +872,10 @@ end
 local function RightPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
     if ImGui.BeginChild("right", x, y-1, true) then
-        if selectedSection ~= 'Raw INI' then
-            DrawSection(selectedSection, schema[selectedSection])
+        if customSections[selectedSection] then
+            customSections[selectedSection]()
         else
-            DrawRawINIEditTab()
+            DrawSection(selectedSection, schema[selectedSection])
         end
     end
     ImGui.EndChild()
@@ -782,7 +883,7 @@ end
 
 local function DrawWindowPanels()
     DrawSplitter(8, basepanesize, 75)
-    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 6, 6)
+    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
     LeftPaneWindow()
     ImGui.SameLine()
     RightPaneWindow()
@@ -802,7 +903,7 @@ local function DrawWindowHeaderSettings()
     end
     ImGui.SameLine()
     if ImGui.Button('Reload INI') then
-        config = LIP.load(mq.configDir..'\\'..INIFile)
+        config = LIP.load(mq.configDir..'/'..INIFile)
     end
     ImGui.Separator()
     ImGui.Text('Start Command: ')
@@ -836,7 +937,7 @@ end
 -- Load INI into table as well as raw content
 INIFile = FindINIFileName()
 if INIFile then
-    config = LIP.load(mq.configDir..'\\'..INIFile)
+    config = LIP.load(mq.configDir..'/'..INIFile)
     INIFileContents = ReadRawINIFile()
 else
     INIFile = string.format('MuleAssist_%s_%s_%d.ini', myServer, myName, myLevel)
