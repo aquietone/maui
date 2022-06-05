@@ -68,6 +68,9 @@ local schema = {
             DanNetOn={--switch + extra option
                 Type='STRING'
             },
+            DanNetDelay={
+                Type='NUMBER'
+            },
             MiscGem={
                 Type='NUMBER',
                 Min=1,
@@ -113,7 +116,6 @@ local schema = {
             }
             --Role
             --GemStuckAbility
-            --DanNetDelay
             --HoTTOn
             --MoveCloserIfNoLOS
             --IRCOn
@@ -173,8 +175,13 @@ local schema = {
             },
             BeforeCombat={
                 Type='SPELL'
+            },
+            TargetSwitchingOn={
+                Type='SWITCH'
+            },
+            DismountDuringFights={
+                Type='SWITCH'
             }
-            --DismountDuringFights
             --TankAllMobs
         }
     },
@@ -470,8 +477,12 @@ local schema = {
                 Min=0,
                 Max=2
             },
-            --BurnText
-            --UseTribute
+            UseTribute={
+                Type='SWITCH'
+            },
+            BurnText={
+                Type='STRING'
+            }
         }
     },
     AFKTools={
