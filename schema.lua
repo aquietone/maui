@@ -102,15 +102,15 @@ local schema = {
             },
             CastingInterruptOn={-- int (0)
                 Type='SWITCH',
-                Tooltip='0=Off/1=On - Will try and interrupt casting to help save mana. Is used for healing or DPS spells. Also see InterruptHeals under [Heals]',
+                Tooltip='0=Off/1=On - Will try and interrupt casting to help save mana. Is used for healing or DPS spells.',
             },
             EQBCOn={--switch + extra option
                 Type='STRING',
-                Tooltip='0=Off/1=On,|ChannelName - Messages for Mez, Heals, Pulls and Tanking in MQ2EQBC. See EQBC for more info.',
+                Tooltip='0=Off/1=On,|ChannelName - Messages for Mez, Heals, Pulls and Tanking in MQ2EQBC.',
             },
             DanNetOn={--switch + extra option
                 Type='STRING',
-                Tooltip='0=Off/1=On,|ChannelName - Messages for Mez, Heals, Pulls and Tanking in DanNet. See DanNet for more info. If both EQBCOn and DanNetOn are on DanNetOn is Turned off.',
+                Tooltip='0=Off/1=On,|ChannelName - Messages for Mez, Heals, Pulls and Tanking in DanNet. If both EQBCOn and DanNetOn are on DanNetOn is Turned off.',
             },
             DanNetDelay={-- int (20)
                 Type='NUMBER',
@@ -224,7 +224,7 @@ local schema = {
             },
             MeleeTwistOn={
                 Type='SWITCH',
-                Tooltip='0=Off/1=On - Toggles melee specific twisting. See General Section for more information.',
+                Tooltip='0=Off/1=On - Toggles melee specific twisting.',
             },
             MeleeTwistWhat={
                 Type='STRING',
@@ -334,7 +334,7 @@ local schema = {
             },
             PowerSource={
                 Type='STRING',
-                Tooltip='Specify the name of the PowerSource you want to maintain being equipped and active in your PowerSource inventory slot, as well as destroy/remove used powersources. You can maintain the PowerSource by treating it as a summoned item. (See Summon Items modifier below).',
+                Tooltip='Specify the name of the PowerSource you want to maintain being equipped and active in your PowerSource inventory slot, as well as destroy/remove used powersources. You can maintain the PowerSource by treating it as a summoned item.',
             },
             BegOn={
                 Type='SWITCH',
@@ -548,12 +548,12 @@ local schema = {
             MaxRadius={
                 Type='NUMBER',
                 Min=1,
-                Tooltip='Radius you want pull mobs with in. (See Image below for a visual)',
+                Tooltip='Radius you want pull mobs with in.',
             },
             MaxZRange={
                 Type='NUMBER',
                 Min=1,
-                Tooltip='Z Axis Radius you want pull mobs with in. Default =50 for hilly zones try 100-200 (See Image below)',
+                Tooltip='Z Axis Radius you want pull mobs with in. Default =50 for hilly zones try 100-200',
             },
             PullWait={
                 Type='NUMBER',
@@ -602,7 +602,7 @@ local schema = {
                 Type='NUMBER',
                 Min=0,
                 Max=360,
-                Tooltip='The width in degrees on the compass. See /setpullarc in the command section.',
+                Tooltip='The width in degrees on the compass.',
             },
             -- CheckForMemblurredMobsInCamp int (0)
             -- PullCond string (TRUE)
