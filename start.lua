@@ -3,6 +3,8 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
+local version = '0.3'
+
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
 local animItems = mq.FindTextureAnimation('A_DragItem')
@@ -304,47 +306,63 @@ local function DrawSpellPicker(sectionName, key, index, selectedIdx)
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
-        if ImGui.BeginMenu('Spells##rcmenu'..sectionName..key) then
-            for _,category in ipairs(spells.categories) do
-                -- Spell Subcategories submenu
-                if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
-                    for _,subcategory in ipairs(spells[category].subcategories) do
-                        -- Subcategory Spell menu
-                        if #spells[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
-                            for _,spell in ipairs(spells[category][subcategory]) do
-                                local spellLevel = mq.TLO.Spell(spell).Level()
-                                SetSpellTextColor(spell)
-                                if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
-                                    valueParts[1] = spell
-                                    selectedUpgrade[selectedIdx] = nil
+        if #spells.categories > 0 then
+            if ImGui.BeginMenu('Spells##rcmenu'..sectionName..key) then
+                for _,category in ipairs(spells.categories) do
+                    -- Spell Subcategories submenu
+                    if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
+                        for _,subcategory in ipairs(spells[category].subcategories) do
+                            -- Subcategory Spell menu
+                            if #spells[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
+                                for _,spell in ipairs(spells[category][subcategory]) do
+                                    local spellLevel = mq.TLO.Spell(spell).Level()
+                                    SetSpellTextColor(spell)
+                                    if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
+                                        valueParts[1] = spell
+                                        selectedUpgrade[selectedIdx] = nil
+                                    end
+                                    ImGui.PopStyleColor()
                                 end
-                                ImGui.PopStyleColor()
+                                ImGui.EndMenu()
                             end
-                            ImGui.EndMenu()
                         end
+                        ImGui.EndMenu()
                     end
-                    ImGui.EndMenu()
                 end
+                ImGui.EndMenu()
             end
-            ImGui.EndMenu()
         end
         -- Top level 'AAs' menu item
-        if ImGui.BeginMenu('AAs##rcmenu'..sectionName..key) then
-            for _,altAbility in ipairs(altAbilities) do
-                if ImGui.MenuItem(altAbility..'##aa'..sectionName..key) then
-                    valueParts[1] = altAbility
-                end
+        if #altAbilities > 0 then
+            local menuHeight = -1
+            if #altAbilities > 25 then
+                menuHeight = ImGui.GetTextLineHeight()*25
             end
-            ImGui.EndMenu()
+            ImGui.SetNextWindowSize(250, menuHeight)
+            if ImGui.BeginMenu('AAs##rcmenu'..sectionName..key) then
+                for _,altAbility in ipairs(altAbilities) do
+                    if ImGui.MenuItem(altAbility..'##aa'..sectionName..key) then
+                        valueParts[1] = altAbility
+                    end
+                end
+                ImGui.EndMenu()
+            end
         end
         -- Top level 'Discs' menu item
-        if ImGui.BeginMenu('Combat Abilities##rcmenu'..sectionName..key) then
-            for _,disc in ipairs(discs) do
-                if ImGui.MenuItem(disc..'##disc'..sectionName..key) then
-                    valueParts[1] = disc
-                end
+        if #discs > 0 then
+            local menuHeight = -1
+            if #discs > 25 then
+                menuHeight = ImGui.GetTextLineHeight()*25
             end
-            ImGui.EndMenu()
+            ImGui.SetNextWindowSize(250, menuHeight)
+            if ImGui.BeginMenu('Combat Abilities##rcmenu'..sectionName..key) then
+                for _,disc in ipairs(discs) do
+                    if ImGui.MenuItem(disc..'##disc'..sectionName..key) then
+                        valueParts[1] = disc
+                    end
+                end
+                ImGui.EndMenu()
+            end
         end
         ImGui.EndPopup()
     end
@@ -445,13 +463,10 @@ local function DrawTooltip(text)
     end
 end
 
-local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx, yOffset)
+local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
     local iniValue = config[sectionName][key..index]
     local iconSize = {30,30} -- default icon size
     if type(index) == 'number' then
-        -- Largest list is 40. UI always draws 20 per row. yOffset is starting Y position for all 
-        -- elements in the 1st row. 2nd row is yOffset + 34 
-        if index <= 20 then ImGui.SetCursorPosY(yOffset) else ImGui.SetCursorPosY(yOffset+34) end
         local x,y = ImGui.GetCursorPos()
         if index == selected[selectedIdx] then
             ImGui.DrawTextureAnimation(animYellowWndPieces, iconSize[1], iconSize[2])
@@ -520,9 +535,14 @@ local function DrawList(sectionName, key, value, selectedIdx)
     end
     ImGui.PopItemWidth()
     local _,yOffset = ImGui.GetCursorPos()
+    local avail = ImGui.GetContentRegionAvail()
+    local iconsPerRow = math.floor(avail/36)
+    if iconsPerRow == 0 then iconsPerRow = 1 end
     for i=1,config[sectionName][key..'Size'] do
-        DrawSpellIconOrButton(sectionName, key, i, selectedIdx, yOffset)
-        if i%20 ~= 0 and i < config[sectionName][key..'Size'] then
+        local offsetMod = math.floor((i-1)/iconsPerRow)
+        ImGui.SetCursorPosY(yOffset+(34*offsetMod))
+        DrawSpellIconOrButton(sectionName, key, i, selectedIdx)
+        if i%iconsPerRow ~= 0 and i < config[sectionName][key..'Size'] then
             ImGui.SameLine()
         end
     end
@@ -575,7 +595,7 @@ local function DrawProperty(sectionName, key, value)
     if value['Type'] == 'SWITCH' then
         config[sectionName][key] = ImGui.Checkbox('##'..key, InitCheckBoxValue(config[sectionName][key]))
     elseif value['Type'] == 'SPELL' then
-        DrawSpellIconOrButton(sectionName, key, '', -1, -1)
+        DrawSpellIconOrButton(sectionName, key, '', -1)
         ImGui.SameLine()
         ImGui.PushItemWidth(350)
         config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, config[sectionName][key])
@@ -633,7 +653,18 @@ local function DrawSection(sectionName, sectionProperties)
     if sectionProperties['Controls'] then
         DrawSectionControlSwitches(sectionName, sectionProperties['Controls'])
     end
-    if ImGui.BeginChild('sectionwindow') then
+    -- special case for SpellSet tab to draw save spell set button
+    if sectionName == 'SpellSet' then
+        if ImGui.Button('Save Spell Set') then
+            if not config['MySpells'] then config['MySpells'] = {} end
+            for i=1,13 do
+                config['MySpells']['Gem'..i] = mq.TLO.Me.Gem(i).Name()
+            end
+            Save()
+            INIFileContents = ReadRawINIFile()
+        end
+    end
+    if ImGui.BeginChild('SectionProperties') then
         -- Draw List properties before general properties
         local listIdx = 1
         for key,value in pairs(sectionProperties['Properties']) do
@@ -648,57 +679,121 @@ local function DrawSection(sectionName, sectionProperties)
                 DrawProperty(sectionName, key, value)
             end
         end
-        ImGui.EndChild()
     end
+    ImGui.EndChild()
 end
 
 local function DrawRawINIEditTab()
-    if ImGui.BeginChild('rawiniwindow') then
-        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            if FileExists(mq.configDir..'\\'..INIFile) then
-                INIFileContents = ReadRawINIFile()
-            end
+    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+        if FileExists(mq.configDir..'\\'..INIFile) then
+            INIFileContents = ReadRawINIFile()
         end
-        if ImGui.Button('Refresh Raw INI##rawini') then
-            if FileExists(mq.configDir..'\\'..INIFile) then
-                INIFileContents = ReadRawINIFile()
-            end
-        end
-        ImGui.SameLine()
-        if ImGui.Button('Save Raw INI##rawini') then
-            WriteRawINIFile(INIFileContents)
-            config = LIP.load(mq.configDir..'\\'..INIFile)
-        end
-        local x,y = ImGui.GetContentRegionAvail()
-        INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
-        ImGui.EndChild()
     end
-    ImGui.EndTabItem()
+    if ImGui.Button('Refresh Raw INI##rawini') then
+        if FileExists(mq.configDir..'\\'..INIFile) then
+            INIFileContents = ReadRawINIFile()
+        end
+    end
+    ImGui.SameLine()
+    if ImGui.Button('Save Raw INI##rawini') then
+        WriteRawINIFile(INIFileContents)
+        config = LIP.load(mq.configDir..'\\'..INIFile)
+    end
+    local x,y = ImGui.GetContentRegionAvail()
+    INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents or '', x-15, y-15, ImGuiInputTextFlags.None)
 end
 
-local function DrawWindowTabBar()
-    if ImGui.BeginTabBar('Settings') then
+local basepanesize = 150
+local lpanesize = 150
+local function DrawSplitter(thickness, size0, min_size0)
+    local x,y = ImGui.GetCursorPos()
+    local delta = 0
+    ImGui.SetCursorPosX(x + size0)
+    
+    ImGui.PushStyleColor(ImGuiCol.Button, 0, 0, 0, 0)
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0, 0, 0)
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0.6, 0.6, 0.6, 0.1)
+    ImGui.Button('##splitter', thickness, -1)
+    ImGui.PopStyleColor(3)
+
+    ImGui.SetItemAllowOverlap()
+
+    if ImGui.IsItemActive() then
+        delta,_ = ImGui.GetMouseDragDelta()
+        
+        if delta < min_size0 - size0 then
+            delta = min_size0 - size0
+        end
+        if delta > 200 - size0 then
+            delta = 200 - size0
+        end
+
+        size0 = size0 + delta
+        lpanesize = size0
+    else
+        basepanesize = lpanesize
+    end
+    ImGui.SetCursorPosX(x)
+    ImGui.SetCursorPosY(y)
+end
+
+local selectedSection = 'General'
+local function LeftPaneWindow()
+    local x,y = ImGui.GetContentRegionAvail()
+    if ImGui.BeginChild("left", lpanesize, y-1, true) then
         for _,sectionName in ipairs(schema.Sections) do
             if schema[sectionName] and (not schema[sectionName].Classes or schema[sectionName].Classes[myClass]) then
-                if ImGui.BeginTabItem(sectionName) then
-                    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                        selected = {0,0,0,0,0}
+                local popStyleColor = false
+                if schema[sectionName]['Controls'] and schema[sectionName]['Controls']['On'] then
+                    if not config[sectionName] or not config[sectionName][sectionName..'On'] or config[sectionName][sectionName..'On'] == 0 then
+                        ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
+                    else
+                        ImGui.PushStyleColor(ImGuiCol.Text, 0, 1, 0, 1)
                     end
-                    DrawSection(sectionName, schema[sectionName])
-                    ImGui.EndTabItem()
+                    popStyleColor = true
                 end
+                local sel = ImGui.Selectable(sectionName, selectedSection == sectionName)
+                if sel and selectedSection ~= sectionName then
+                    selected = {0,0,0,0,0}
+                    selectedSection = sectionName
+                end
+                if popStyleColor then ImGui.PopStyleColor() end
             end
         end
-        if ImGui.BeginTabItem('Raw') then
+        local sel = ImGui.Selectable('Raw INI', selectedSection == 'Raw INI')
+        if sel then
+            selectedSection = 'Raw INI'
+        end
+    end
+    ImGui.EndChild()
+end
+
+local function RightPaneWindow()
+    local x,y = ImGui.GetContentRegionAvail()
+    if ImGui.BeginChild("right", x, y-1, true) then
+        if selectedSection ~= 'Raw INI' then
+            DrawSection(selectedSection, schema[selectedSection])
+        else
             DrawRawINIEditTab()
         end
-        ImGui.EndTabBar()
     end
+    ImGui.EndChild()
+end
+
+local function DrawWindowPanels()
+    DrawSplitter(8, basepanesize, 75)
+    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 6, 6)
+    LeftPaneWindow()
+    ImGui.SameLine()
+    RightPaneWindow()
+    ImGui.PopStyleVar()
 end
 
 local function DrawWindowHeaderSettings()
     ImGui.Text('INI File: ')
     ImGui.SameLine()
+    ImGui.SetCursorPosX(120)
+    ImGui.PushItemWidth(350)
     INIFile,_ = ImGui.InputText('##INIInput', INIFile)
     ImGui.SameLine()
     if ImGui.Button('Save INI') then
@@ -712,6 +807,8 @@ local function DrawWindowHeaderSettings()
     ImGui.Separator()
     ImGui.Text('Start Command: ')
     ImGui.SameLine()
+    ImGui.SetCursorPosX(120)
+    ImGui.PushItemWidth(350)
     StartCommand,_ = ImGui.InputText('##StartCommand', StartCommand)
     ImGui.SameLine()
     if ImGui.Button('Start Macro') then
@@ -720,11 +817,17 @@ local function DrawWindowHeaderSettings()
     ImGui.Separator()
 end
 
+local initialRun = true
 local MAUI = function()
-    open, shouldDrawUI = ImGui.Begin('MuleAssist', open)
+    open, shouldDrawUI = ImGui.Begin('MuleAssist UI (v'..version..')###MuleAssist', open)
     if shouldDrawUI then
+        -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
+        if initialRun and ImGui.GetWindowHeight() == 102 and ImGui.GetWindowWidth() == 623 then
+            ImGui.SetWindowSize(727,487)
+            initialRun = false
+        end
         DrawWindowHeaderSettings()
-        DrawWindowTabBar()
+        DrawWindowPanels()
     end
     ImGui.End()
     if not open then terminate = true end

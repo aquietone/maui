@@ -1,3 +1,7 @@
+0.3
+- Swap tab bar for left hand side menu
+- Add Save Spell Set button under spell set settings
+- Some layout tweaks to spell picker menu and list item icons
 0.2
 - Frames for list items, highlighting for selected item
 - Added some more options from the macro
