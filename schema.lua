@@ -323,10 +323,12 @@ local schema = {
     Mez={
         Controls={
             On={
-                Type='SWITCH',
+                Type='NUMBER',
+                Min=0,
+                Max=3,
             },
         },
-        Classes={brd=1,enc=1},
+        --Classes={brd=1,enc=1},
         Properties={
             MezRadius={
                 Type='NUMBER',
