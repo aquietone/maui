@@ -1,7 +1,7 @@
 local schemas = {'ma'}--, 'ka',}
 
 local globals = {
-    Version = '0.7.5',
+    Version = '0.8.0',
     INIFile = nil, -- file name of character INI to load
     INIFileContents = nil, -- raw file contents for raw INI tab
     Config = nil, -- lua table version of INI content

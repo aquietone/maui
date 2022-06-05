@@ -43,7 +43,21 @@ if utils.FileExists(globals.MAUI_INI) then
     globals.MAUI_Config = LIP.load(globals.MAUI_INI, false)
 end
 if not globals.MAUI_Config or not globals.MAUI_Config[maui_ini_key] or not globals.MAUI_Config[maui_ini_key]['StartCommand'] then
-    globals.MAUI_Config = {[maui_ini_key] = {['StartCommand'] = globals.Schema['StartCommand'],}}
+    globals.MAUI_Config = {[maui_ini_key] = {['StartCommand'] = globals.Schema['StartCommands'][1],}}
+end
+
+local selected_start_command = nil
+for _,startcommand in ipairs(globals.Schema['StartCommands']) do
+    if startcommand == globals.MAUI_Config[maui_ini_key]['StartCommand'] then
+        selected_start_command = startcommand
+    end
+end
+if not selected_start_command then
+    if globals.MAUI_Config[maui_ini_key]['StartCommand'] then
+        selected_start_command = 'custom'
+    else
+        selected_start_command = globals.Schema['StartCommands'][1]
+    end
 end
 
 -- Storage for spell/AA/disc picker
@@ -940,6 +954,18 @@ local function SetSchemaVars(selectedSchema)
     return true
 end
 
+local function DrawComboBox(label, resultvar, options)
+    if ImGui.BeginCombo(label, resultvar) then
+        for i,j in pairs(options) do
+            if ImGui.Selectable(j, j == resultvar) then
+                resultvar = j
+            end
+        end
+        ImGui.EndCombo()
+    end
+    return resultvar
+end
+
 local radioValue = 1
 local function DrawWindowHeaderSettings()
     if #globals.Schemas > 1 then
@@ -974,30 +1000,70 @@ local function DrawWindowHeaderSettings()
         globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
     end
 
+    local match_found = false
+    for _,startcommand in ipairs(globals.Schema['StartCommands']) do
+        if startcommand == globals.MAUI_Config[maui_ini_key]['StartCommand'] then
+            selected_start_command = startcommand
+            match_found = true
+            break
+        end
+    end
+    if not match_found then
+        if globals.MAUI_Config[maui_ini_key]['StartCommand'] then
+            selected_start_command = 'custom'
+        else
+            selected_start_command = globals.Schema['StartCommands'][1]
+        end
+    end
+
     ImGui.Separator()
     ImGui.Text('Start Command: ')
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
-    ImGui.PushItemWidth(350)
-    globals.MAUI_Config[maui_ini_key]['StartCommand'],_ = ImGui.InputText('##StartCommand', globals.MAUI_Config[maui_ini_key]['StartCommand'])
+    ImGui.PushItemWidth(190)
+    selected_start_command = DrawComboBox('##StartCommands', selected_start_command, globals.Schema['StartCommands'])
     ImGui.SameLine()
-    if ImGui.Button('Start Macro') then
-        mq.cmd(globals.MAUI_Config[maui_ini_key]['StartCommand'])
-        SaveMAUIConfig()
-    end
-    ImGui.SameLine()
-    if ImGui.Button('End') then
-        mq.cmd('/end')
-    end
-    ImGui.SameLine()
-    if mq.TLO.Macro.Paused() then
-        if ImGui.Button('Resume') then
-            mq.cmd('/mqp off')
-        end
+    ImGui.PushItemWidth(300)
+    if selected_start_command == 'custom' then
+        globals.MAUI_Config[maui_ini_key]['StartCommand'],_ = ImGui.InputText('##StartCommand', globals.MAUI_Config[maui_ini_key]['StartCommand'])
     else
-        if ImGui.Button('Pause') then
-            mq.cmd('/mqp on')
+        globals.MAUI_Config[maui_ini_key]['StartCommand'],_ = ImGui.InputText('##StartCommand', selected_start_command)
+    end
+    --ImGui.SameLine()
+    ImGui.Text('Status: ')
+    ImGui.SameLine()
+    ImGui.SetCursorPosX(120)
+    if not mq.TLO.Macro() or mq.TLO.Macro.Name() ~= 'muleassist.mac' then
+        ImGui.TextColored(1, 0, 0, 1, 'STOPPED')
+        ImGui.SameLine()
+        if ImGui.Button('Start Macro') then
+            mq.cmd(globals.MAUI_Config[maui_ini_key]['StartCommand'])
+            SaveMAUIConfig()
         end
+    elseif mq.TLO.Macro.Name() == 'muleassist.mac' then
+        if mq.TLO.Macro.Paused() then
+            ImGui.TextColored(1, 1, 0, 1, 'PAUSED')
+            ImGui.SameLine()
+            if ImGui.Button('End') then
+                mq.cmd('/end')
+            end
+            ImGui.SameLine()
+            if ImGui.Button('Resume') then
+                mq.cmd('/mqp off')
+            end
+        else
+            ImGui.TextColored(0, 1, 0, 1, 'RUNNING')
+            ImGui.SameLine()
+            if ImGui.Button('End') then
+                mq.cmd('/end')
+            end
+            ImGui.SameLine()
+            if ImGui.Button('Pause') then
+                mq.cmd('/mqp on')
+            end
+        end
+        ImGui.SameLine()
+        ImGui.Text(string.format('Role: %s', mq.TLO.Macro.Variable('Role')()))
     end
     ImGui.Separator()
 end
