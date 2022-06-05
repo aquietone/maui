@@ -666,6 +666,7 @@ local function DrawWindowTabBar()
         if ImGui.BeginTabItem('Raw') then
             DrawRawINIEditTab()
         end
+        ImGui.EndTabBar()
     end
 end
 
