@@ -377,6 +377,11 @@ local schema = {
             },
         },
         Properties={
+            PetToys={
+                Type='LIST',
+                Max=6,
+                Conditions=false,
+            },
             PetSpell={
                 Type='SPELL',
             },
@@ -420,18 +425,10 @@ local schema = {
             MoveWhenHit={
                 Type='SWITCH',
             },
-            PetToysSize={
-                Type='NUMBER',
-                Max=6,
-            },
             PetToysOn={
                 Type='SWITCH',
             },
-            PetToys={
-                Type='STRING',
-            },
             --PetToysGave=internal?
-            --PetToysSize
             --PetForceHealOnMed int
             --PetBehind bool
         }
