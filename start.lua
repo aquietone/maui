@@ -142,6 +142,7 @@ end
 
 local GetSpellUpgrade = function(targetType, subCat, numEffects)
     local max = 0
+    local max2 = 0
     local maxName = ''
     for i=1,960 do
         local valid = true
@@ -179,10 +180,16 @@ local GetSpellUpgrade = function(targetType, subCat, numEffects)
                         if spell.Base(SPAIdx)() < max then
                             max = spell.Base(SPAIdx)()
                             maxName = spell.Name():gsub(' Rk%..*', '')
+                        elseif spell.Base2(SPAIdx)() ~= 0 and spell.Base2(SPAIdx)() > max2 then
+                            max2 = spell.Base2(SPAIdx)()
+                            maxName = spell.Name():gsub(' Rk%..*', '')
                         end
                     else
                         if spell.Base(SPAIdx)() > max then
                             max = spell.Base(SPAIdx)()
+                            maxName = spell.Name():gsub(' Rk%..*', '')
+                        elseif spell.Base2(SPAIdx)() ~= 0 and spell.Base2(SPAIdx)() > max2 then
+                            max2 = spell.Base2(SPAIdx)()
                             maxName = spell.Name():gsub(' Rk%..*', '')
                         end
                     end
@@ -443,7 +450,7 @@ local DrawProperty = function(sectionName, key, value)
                 ImGui.Text(part['Name']..': ')
                 ImGui.SameLine()
                 ImGui.PushItemWidth(100)
-                parts[partIdx] = ImGui.InputInt('##'..sectionName..key, tonumber(parts[partIdx]))
+                parts[partIdx] = ImGui.InputInt('##'..sectionName..key..partIdx, tonumber(parts[partIdx]))
                 ImGui.PopItemWidth()
                 if part['Min'] and parts[partIdx] < part['Min'] then
                     parts[partIdx] = part['Min']
