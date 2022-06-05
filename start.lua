@@ -157,12 +157,22 @@ local GetSpellUpgrade = function(targetType, subCat, numEffects)
         end
         if valid then
             if spell.HasSPA(470)() or spell.HasSPA(374)() or spell.HasSPA(340)() then
-                -- TODO: handle spells with trigger effect SPAs
-                --[[for eIdx=1,spell.NumEffects() do
+                for eIdx=1,spell.NumEffects() do
                     for SPAIdx=1,spell.Trigger(eIdx).NumEffects() do
-
+                        if spell.Trigger(eIdx).Base(SPAIdx)() < -1 then
+                            if spell.Trigger(eIdx).Base(SPAIdx)() < max then
+                                max = spell.Trigger(eIdx).Base(SPAIdx)()
+                                maxName = spell.Name():gsub(' Rk%..*', '')
+                            end
+                        else
+                            if spell.Trigger(eIdx).Base(SPAIdx)() > max then
+                                max = spell.Trigger(eIdx).Base(SPAIdx)()
+                                maxName = spell.Name():gsub(' Rk%..*', '')
+                            end
+                        end
                     end
-                end--]]
+                end
+                -- TODO: this won't handle spells whos trigger SPA is just the illusion portion
             elseif spell.SPA() then
                 for SPAIdx=1,spell.NumEffects() do
                     if spell.Base(SPAIdx)() < -1 then
