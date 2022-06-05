@@ -1310,7 +1310,7 @@ local function NewSpellMemmed(line, spell)
         AddSpellToMap(spell)
     end
 
-    SortSpellMap()
+    SortMap()
 end
 
 -- Load INI into table as well as raw content
