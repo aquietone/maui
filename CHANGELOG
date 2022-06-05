@@ -1,3 +1,5 @@
+0.7.2
+- Fix writing INI when missing size property from INI
 0.7.1
 - Add support for dropping items into MAUI in places that accept items, like the DPS list, pet focus, etc.
 - Fix drag/drop entering into selected item view of the drop target

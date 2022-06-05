@@ -106,8 +106,8 @@ function LIP.save(fileName, data, schema)
 					for k,v in pairs(schema[sectionKey]['Properties']) do
 						-- If the property is a list, like XYZ1, XYZ2, then iterator over XYZSize, writing XYZ# and XYZCond#
 						if v['Type'] == 'LIST' then
-							contents = contents .. ('%s=%s\n'):format(k..'Size', tostring(data[sectionKey][k..'Size']));
 							if data[sectionKey][k..'Size'] then
+								contents = contents .. ('%s=%s\n'):format(k..'Size', tostring(data[sectionKey][k..'Size']));
 								for i=1,data[sectionKey][k..'Size'] do
 									if data[sectionKey][k..tostring(i)] ~= nil then
 										contents = WriteKV(contents, k..tostring(i), data[sectionKey][k..tostring(i)])
