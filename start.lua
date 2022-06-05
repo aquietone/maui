@@ -106,6 +106,7 @@ local InitSpellTree = function()
             end
         end
     end
+    -- sort categories and subcategories alphabetically, spells by level
     table.sort(spells.categories)
     for category,subcategories in pairs(spells) do
         if category ~= 'categories' then
@@ -132,6 +133,7 @@ end
 
 local InitDiscTree = function()
     -- Build disc tree for picking discs
+    -- TODO: split up by timers? haven't really looked at discs yet
     repeat
         local name = mq.TLO.Me.CombatAbility(discIter).Name():gsub(' Rk%..*', '')
         table.insert(discs, name)
@@ -140,10 +142,12 @@ local InitDiscTree = function()
     table.sort(discs)
 end
 
-local GetSpellUpgrade = function(targetType, subCat, numEffects)
+--Given some spell data input, determine whether a better spell with the same inputs exists
+local GetSpellUpgrade = function(targetType, subCat, numEffects, minLevel)
     local max = 0
     local max2 = 0
     local maxName = ''
+    local maxLevel = 0
     for i=1,960 do
         local valid = true
         local spell = mq.TLO.Me.Book(i)
@@ -155,20 +159,25 @@ local GetSpellUpgrade = function(targetType, subCat, numEffects)
             valid = false
         elseif spell.NumEffects() ~= numEffects then
             valid = false
+        elseif spell.Level() <= minLevel then
+            valid = false
         end
         if valid then
+            -- TODO: several trigger spells i don't think this would handle properly...
             if spell.HasSPA(470)() or spell.HasSPA(374)() or spell.HasSPA(340)() then
                 for eIdx=1,spell.NumEffects() do
-                    for SPAIdx=1,spell.Trigger(eIdx).NumEffects() do
-                        if spell.Trigger(eIdx).Base(SPAIdx)() < -1 then
-                            if spell.Trigger(eIdx).Base(SPAIdx)() < max then
-                                max = spell.Trigger(eIdx).Base(SPAIdx)()
-                                maxName = spell.Name():gsub(' Rk%..*', '')
-                            end
-                        else
-                            if spell.Trigger(eIdx).Base(SPAIdx)() > max then
-                                max = spell.Trigger(eIdx).Base(SPAIdx)()
-                                maxName = spell.Name():gsub(' Rk%..*', '')
+                    if spell.Trigger(eIdx)() then
+                        for SPAIdx=1,spell.Trigger(eIdx).NumEffects() do
+                            if spell.Trigger(eIdx).Base(SPAIdx)() < -1 then
+                                if spell.Trigger(eIdx).Base(SPAIdx)() < max then
+                                    max = spell.Trigger(eIdx).Base(SPAIdx)()
+                                    maxName = spell.Name():gsub(' Rk%..*', '')
+                                end
+                            else
+                                if spell.Trigger(eIdx).Base(SPAIdx)() > max then
+                                    max = spell.Trigger(eIdx).Base(SPAIdx)()
+                                    maxName = spell.Name():gsub(' Rk%..*', '')
+                                end
                             end
                         end
                     end
@@ -202,6 +211,7 @@ end
 
 -- ImGui functions
 
+-- Color spell names in spell picker similar to the spell bar context menus
 local SetSpellTextColor = function(spell)
     local target = mq.TLO.Spell(spell).TargetType()
     if target == 'Single' or target == 'Line of Sight' or target == 'Undead' then
@@ -227,7 +237,14 @@ local SetSpellTextColor = function(spell)
     end
 end
 
-local DrawSpellPicker = function(sectionName, key, index)
+-- Recreate the spell bar context menu
+-- sectionName+key+index defines where to store the result
+-- selectedIdx is used to clear spell upgrade input incase of updating over an existing entry
+local DrawSpellPicker = function(sectionName, key, index, selectedIdx)
+    if not config[sectionName][key..index] then
+        config[sectionName][key..index] = ''
+    end
+    local valueParts = Split(config[sectionName][key..index])
     -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
         -- Top level 'Spells' menu item
@@ -242,8 +259,8 @@ local DrawSpellPicker = function(sectionName, key, index)
                                 local spellLevel = mq.TLO.Spell(spell).Level()
                                 SetSpellTextColor(spell)
                                 if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
-                                    -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
-                                    config[sectionName][key..index] = spell
+                                    valueParts[1] = spell
+                                    selectedUpgrade[selectedIdx] = nil
                                 end
                                 ImGui.PopStyleColor()
                             end
@@ -259,7 +276,7 @@ local DrawSpellPicker = function(sectionName, key, index)
         if ImGui.BeginMenu('AAs##rcmenu'..sectionName..key) then
             for _,altAbility in ipairs(altAbilities) do
                 if ImGui.MenuItem(altAbility..'##aa'..sectionName..key) then
-                    config[sectionName][key..index] = altAbility
+                    valueParts[1] = altAbility
                 end
             end
             ImGui.EndMenu()
@@ -268,51 +285,73 @@ local DrawSpellPicker = function(sectionName, key, index)
         if ImGui.BeginMenu('Combat Abilities##rcmenu'..sectionName..key) then
             for _,disc in ipairs(discs) do
                 if ImGui.MenuItem(disc..'##disc'..sectionName..key) then
-                    config[sectionName][key..index] = disc
+                    valueParts[1] = disc
                 end
             end
             ImGui.EndMenu()
         end
         ImGui.EndPopup()
     end
+    config[sectionName][key..index] = table.concat(valueParts, '|')
+    if config[sectionName][key..index] == '|' then
+        config[sectionName][key..index] = 'NULL'
+    end
 end
 
 -- Draw the value and condition of the selected list item
 local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
+    local valueKey = key..selected[selectedIdx]
+    local valueCondKey = key..'Cond'..selected[selectedIdx]
+    -- make sure values not nil so imgui inputs don't barf
+    if config[sectionName][valueKey] == nil then
+        config[sectionName][valueKey] = 'NULL'
+    end
+    -- split the value so we can update spell name and stuff after the | individually
+    local valueParts = Split(config[sectionName][valueKey])
+    if not valueParts[1] then valueParts[1] = '' end
+    if not valueParts[2] then valueParts[2] = '' end
+
     ImGui.Separator()
     ImGui.Text(string.format('%s.%s%d', sectionName, key, selected[selectedIdx]))
     ImGui.Text('Value: ')
     ImGui.SameLine()
-    if config[sectionName][key..selected[selectedIdx]] == nil then
-        config[sectionName][key..selected[selectedIdx]] = 'NULL'
-    end
     ImGui.SetCursorPosX(175)
-    -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
-    config[sectionName][key..selected[selectedIdx]] = ImGui.InputText('##'..sectionName..key..selected[selectedIdx], config[sectionName][key..selected[selectedIdx]])
+    -- the first part, spell/item/disc name, /command, etc
+    valueParts[1] = ImGui.InputText('##'..sectionName..valueKey, valueParts[1])
+    ImGui.Text('Options: ')
+    ImGui.SameLine()
+    ImGui.SetCursorPosX(175)
+    -- the rest of the stuff after the first |, classes, percents, oog, etc
+    valueParts[2] = ImGui.InputText('##'..sectionName..valueKey..'options', valueParts[2])
     if value['Conditions'] then
         ImGui.Text('Condition: ')
         ImGui.SameLine()
-        if config[sectionName][key..'Cond'..selected[selectedIdx]] == nil then
-            config[sectionName][key..'Cond'..selected[selectedIdx]] = 'NULL'
+        if config[sectionName][valueCondKey] == nil then
+            config[sectionName][valueCondKey] = 'NULL'
         end
         ImGui.SetCursorPosX(175)
-        config[sectionName][key..'Cond'..selected[selectedIdx]] = ImGui.InputText('##condition'..sectionName..key..selected[selectedIdx], config[sectionName][key..'Cond'..selected[selectedIdx]])
+        config[sectionName][valueCondKey] = ImGui.InputText('##cond'..sectionName..valueKey, config[sectionName][valueCondKey])
     end
     -- TODO: There's probably better ways to handle finding and displaying the upgrade spell button...
-    local iniValueParts = Split(config[sectionName][key..selected[selectedIdx]])
-    local spell = mq.TLO.Spell(iniValueParts[1])
-    if spell then
+    local spell = mq.TLO.Spell(valueParts[1])
+    if spell() then
+        -- Avoid finding the upgrade more than once
         if not selectedUpgrade[selectedIdx] then
-            selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects())
+            selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
         end
+        -- Upgrade found? display the upgrade button
         if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
             if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
-                -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
-                config[sectionName][key..selected[selectedIdx]] = selectedUpgrade[selectedIdx]
+                valueParts[1] = selectedUpgrade[selectedIdx]
                 selectedUpgrade[selectedIdx] = nil
             end
         end
     end
+    config[sectionName][valueKey] = table.concat(valueParts, '|')
+    if config[sectionName][valueKey] == '|' then
+        config[sectionName][valueKey] = ''
+    end
+    config[sectionName][valueKey] = config[sectionName][valueKey]:gsub('|$','')
     ImGui.Separator()
 end
 
@@ -345,6 +384,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
             ImGui.PopTextWrapPos()
             ImGui.EndTooltip()
         end
+        -- Handle clicks on spell icon animations that aren't buttons
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
             if selectedIdx >= 0 then 
                 selected[selectedIdx] = index
@@ -352,7 +392,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
             end
         end
         -- Spell picker context menu on right click button
-        DrawSpellPicker(sectionName, key, index)
+        DrawSpellPicker(sectionName, key, index, selectedIdx)
     else
         if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
             if selectedIdx >= 0 then
@@ -360,7 +400,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, selectedIdx)
                 selectedUpgrade[selectedIdx] = nil
             end
         end
-        DrawSpellPicker(sectionName, key, index)
+        DrawSpellPicker(sectionName, key, index, selectedIdx)
     end
 end
 
@@ -373,6 +413,7 @@ local DrawList = function(sectionName, key, value, selectedIdx)
         config[sectionName][key..'Size'] = 1
     end
     ImGui.SetCursorPosX(175)
+    -- Set size of list and check boundaries
     config[sectionName][key..'Size'] = ImGui.InputInt('##sizeinput'..sectionName..key, config[sectionName][key..'Size'])
     if config[sectionName][key..'Size'] < 0 then
         config[sectionName][key..'Size'] = 0
