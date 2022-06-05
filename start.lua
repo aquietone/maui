@@ -508,7 +508,7 @@ end
 local function DrawMultiPartProperty(sectionName, key, value)
     -- TODO: what's a nice clean way to represent values which are multiple parts? 
     -- Currently just using this experimentally with RezAcceptOn
-    local parts = Split(config[sectionName][key], '|')
+    local parts = Split(config[sectionName][key], '|',1)
     for partIdx,part in ipairs(value['Parts']) do
         if part['Type'] == 'SWITCH' then
             ImGui.Text(part['Name']..': ')
