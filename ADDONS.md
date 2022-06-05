@@ -1,28 +1,42 @@
 # Extending MAUI to support other INI based macros
 
-Ignore these instructions for now... this whole thing is still a WIP.
+MAUI has been refactored a little bit to allow for it to support other macros that are **very** similar to MuleAssist (i.e. KissAssist).
 
-## Addons folder
+## start.lua
 
-Add a new addon file such as `ka.lua`.
-
-## Schemas folder
-
-Add a new schema file such as `ka.lua`.
+The bulk of the implementation for MAUI lives in `start.lua` and provides functions for how to display INI sections with properties of different types, such as lists, switches, numbers or strings.
+The content displayed is based on what is defined in the currently selected schema file, which defines the sections and their properties.
+In addition to the generic sections, custom sections will be shown from an included macro specific `.lua` file.
 
 ## globals.lua
 
-Add a new value to the schemas table in `globals.lua`: `local schemas = {'ma', 'ka'}`. The value should match the name of the schema and addon files.
+Among other things, `globals.lua` includes an array table of schema names which MAUI supports. This is stored in `globals.Schemas`.
+Currently, this only includes `ma` for the `MuleAssist` macro.
 
-# Adding schemas for KA like macros
+To support other macros, step one would be adding a schema name for the macro to this table, such as `ka` for the `KissAssist` macro.
 
-MAUI relies heavily on the fact that KA and MA are almost identical to each other.
-A macro with a different configuration structure won't work at all.
-A macro with INI configuration may have some varying degree of success depending how similar it is to MA.
+## Addons folder
+
+The addons folder contains the macro specific implementations. For example, `MuleAssist` includes custom sections for:
+
+1. Debug options
+2. Shared lists (nofire, nomagic, mezimmune, etc.)
+3. Import KA INI
+
+In order to add macro specific implementation for a new macro, add a new file `{schema_name}.lua` where `{schema_name}` is the name which was added to `globals.Schemas` above.
+For example, to add custom sections for the `KissAssist` macro, add a new file `ka.lua` to the `addons` folder.
+
+## Schemas folder
+
+The schemas folder contains the schema of sections and properties for the macros supported by MAUI. Currently, this only includes `ma` for the `MuleAssist` macro.
+
+In order to add a schema for another macro, add a new file `{schema_name}.lua` where `{schema_name}` is the name which was added to `globals.Schemas` above.
+For example, to add a new schema file for the `KissAssist` macro, add a new file `ka.lua` to the `schemas` folder.
+
 
 ## Creating the schema file in the schemas folder
 
-Just copy one of the existing ones and fit it to the new macro.
+Just copy one of the existing ones and fit it to the new macro being added.
 
 - Define the INI file pattern -- this needs to be refactored some really to handle differing # of inputs to the formatted string for different macros, i.e. KA doesn't include server name while MA does.
 
