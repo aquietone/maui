@@ -1,6 +1,6 @@
 0.7.3
 - Add end and pause/resume buttons
-- Persist Start Command to new `configDir/maui.ini` for each character
+- Persist Start Command to `configDir/server_Charactername.ini` for each character under `[MAUI]` section
 0.7.2
 - Fix writing INI when missing size property from INI
 0.7.1
