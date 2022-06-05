@@ -1,4 +1,9 @@
 local schema = {
+    StartCommand = '/mac kissassist assist ${Group.MainAssist}',
+    INI_PATTERNS = {
+        ['nolevel'] = 'KissAssist_%s.ini',
+        ['default'] = 'nolevel',
+    },
     -- Array For tab and INI ordering purposes
     Sections = {
         'General',
@@ -12,6 +17,7 @@ local schema = {
         'KConditions',
         'Pet',
         'Pull',
+        'PullAdvanced',
         'Aggro',
         'Cures',
         'Merc',

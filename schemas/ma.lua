@@ -1,4 +1,10 @@
 local schema = {
+    INI_PATTERNS = {
+            ['level'] = 'MuleAssist_%s_%s_%d.ini',
+            ['nolevel'] = 'MuleAssist_%s_%s.ini',
+            ['default'] = 'nolevel',
+    },
+    StartCommand = '/mac muleassist assist ${Group.MainAssist}',
     -- Array For tab and INI ordering purposes
     Sections = {
         'General',
@@ -580,7 +586,7 @@ local schema = {
             },
             ChainPullPause={
                 Type='STRING',
-                Tooltip='',
+                Tooltip='Time in Minutes to pull mobs before Holding Pulls|How long in minutes after holding to resume pulls.',
             },
             PullLevel={
                 Type='STRING',
