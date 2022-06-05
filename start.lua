@@ -1,10 +1,12 @@
 --- @type mq
-local mq = require 'mq'
+local mq = require('mq')
 --- @type ImGui
-require 'ImGui'
-local LIP = require 'ma.LIP'
-local globals = require 'ma.globals'
-local utils = require 'ma.utils'
+require('ImGui')
+local LIP = require('ma.lib.LIP')
+local globals = require('ma.globals')
+local utils = require('ma.utils')
+local filedialog = require('ma.lib.imguifiledialog')
+local cache = require('ma.lib.cache')
 
 globals.CurrentSchema = 'ma'
 globals.Schema = require('ma.schemas.'..globals.CurrentSchema)
@@ -31,6 +33,8 @@ local leftPanelWidth = 150
 local selectedListItem = {nil, 0} -- {key, index}
 local selectedUpgrade = nil
 local selectedSection = 'General' -- Left hand menu selected item
+
+local tloCache = cache:new(200, 300)
 
 globals.MyServer = mq.TLO.EverQuest.Server()
 globals.MyName = mq.TLO.Me.CleanName()
@@ -255,7 +259,7 @@ end
 
 -- Color spell names in spell picker similar to the spell bar context menus
 local function SetSpellTextColor(spell)
-    local target = mq.TLO.Spell(spell).TargetType()
+    local target = tloCache:get(spell..'.targettype', function() return mq.TLO.Spell(spell).TargetType() end)
     if target == 'Single' or target == 'Line of Sight' or target == 'Undead' then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
     elseif target == 'Self' then
@@ -355,13 +359,17 @@ local function DrawSpellPicker(sectionName, key, index)
                 ImGui.EndMenu()
             end
         end
-        if valueParts[1] and mq.TLO.Me.Book(mq.TLO.Spell(valueParts[1]).RankName())() then
-            if ImGui.MenuItem('Memorize Spell') then
-                for i=1,13 do
-                    if not mq.TLO.Me.Gem(i)() then
-                        memspell = valueParts[1]
-                        memgem = i
-                        break
+        if valueParts[1] then
+            local rankname = tloCache:get(valueParts[1]..'.rankname', function() return mq.TLO.Spell(valueParts[1]).RankName() end)
+            local bookidx = tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end)
+            if bookidx then
+                if ImGui.MenuItem('Memorize Spell') then
+                    for i=1,13 do
+                        if not mq.TLO.Me.Gem(i)() then
+                            memspell = valueParts[1]
+                            memgem = i
+                            break
+                        end
                     end
                 end
             end
@@ -454,7 +462,7 @@ local function DrawSelectedListItem(sectionName, key, value)
         end
         globals.Config[sectionName][valueCondKey] = DrawKeyAndInputText('Conditions: ', '##cond'..sectionName..valueKey, globals.Config[sectionName][valueCondKey], value['CondTooltip'])
     end
-    local spell = mq.TLO.Spell(valueParts[1])
+    local spell = tloCache:get(valueParts[1], function() return mq.TLO.Spell(valueParts[1]) end)
     if mq.TLO.Me.Book(spell.RankName())() then
         local upgradeResult = DrawSelectedSpellUpgradeButton(spell)
         if upgradeResult then valueParts[1] = upgradeResult end
@@ -507,22 +515,32 @@ local function DrawTooltip(text)
     end
 end
 
-local function ValidSpellOrItem(iniValue)
+local function CharacterHasThing(iniValue)
     local valid = false
     if not iniValue then
         -- count unset INI entry as valid
         valid = true
+    elseif tloCache:get('invalid.'..iniValue) then
+        valid = false
     else
-        if mq.TLO.Spell(iniValue)() then
-            if mq.TLO.Me.Book(mq.TLO.Spell(iniValue).RankName())() then
+        local rankname = tloCache:get(iniValue..'.rankname', function() return mq.TLO.Spell(iniValue).RankName() end)
+        if rankname then
+            if tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end) then
                 valid = true
-            elseif mq.TLO.Me.AltAbility(iniValue)() then
+            elseif tloCache:get('aa.'..iniValue, function() return mq.TLO.Me.AltAbility(iniValue)() end) then
                 valid = true
-            elseif mq.TLO.Me.CombatAbility(iniValue)() then
+            elseif tloCache:get('disc.'..rankname, function() return mq.TLO.Me.CombatAbility(rankname)() end) then
                 valid = true
             end
-        elseif mq.TLO.FindItem(iniValue)() then
+        elseif tloCache:get('item.'..iniValue, function() return mq.TLO.FindItem(iniValue)() end) then
             valid = true
+        elseif iniValue:find('command:') or iniValue:find('${') then
+            valid = true
+        elseif tloCache:get('ability.'..iniValue, function() return mq.TLO.Me.Ability(iniValue)() end) then
+            valid = true
+        else
+            tloCache:get('invalid.'..iniValue, function() return 1 end)
+            valid = false
         end
     end
     return valid
@@ -537,7 +555,7 @@ local function DrawSpellIconOrButton(sectionName, key, index)
             iniValue = tostring(globals.Config[sectionName][key..index])
         end
     end
-    local charHasAbility = ValidSpellOrItem(iniValue)
+    local charHasAbility = CharacterHasThing(iniValue)
     local iconSize = {30,30} -- default icon size
     if type(index) == 'number' then
         local x,y = ImGui.GetCursorPos()
@@ -550,25 +568,27 @@ local function DrawSpellIconOrButton(sectionName, key, index)
     end
     if iniValue then
         -- Use first part of INI value as spell or item name to lookup icon
-        if mq.TLO.Spell(iniValue)() then
+        if tloCache:get('invalid.'..iniValue) then
+            DrawPlainListButton(sectionName, key, index, iconSize)
+        elseif tloCache:get(iniValue..'.name', function() return mq.TLO.Spell(iniValue)() end) then
             -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
             ImGui.BeginGroup()
             local x,y = ImGui.GetCursorPos()
             ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
             ImGui.SetCursorPosX(x)
             ImGui.SetCursorPosY(y)
-            local spellIcon = mq.TLO.Spell(iniValue).SpellIcon()
+            local spellIcon = tloCache:get(iniValue..'.spellicon', function() return mq.TLO.Spell(iniValue).SpellIcon() end)
             animSpellIcons:SetTextureCell(spellIcon)
             ImGui.DrawTextureAnimation(animSpellIcons, iconSize[1], iconSize[2])
             ImGui.EndGroup()
-        elseif mq.TLO.FindItem(iniValue)() then
+        elseif tloCache:get('item.'..iniValue, function() return mq.TLO.FindItem(iniValue)() end) then
             -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
             ImGui.BeginGroup()
             local x,y = ImGui.GetCursorPos()
             ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
             ImGui.SetCursorPosX(x)
             ImGui.SetCursorPosY(y)
-            local itemIcon = mq.TLO.FindItem(iniValue).Icon()
+            local itemIcon = tloCache:get('itemicon.'..iniValue, function() return mq.TLO.FindItem(iniValue).Icon() end)
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, iconSize[1], iconSize[2])
             ImGui.EndGroup()
@@ -1005,6 +1025,10 @@ local function DrawWindowHeaderSettings()
     ImGui.PushItemWidth(350)
     globals.INIFile,_ = ImGui.InputText('##INIInput', globals.INIFile)
     ImGui.SameLine()
+    if ImGui.Button('Choose...') then
+        filedialog.set_file_selector_open(true)
+    end
+    ImGui.SameLine()
     if ImGui.Button('Save INI') then
         Save()
         globals.INIFileContents = utils.ReadRawINIFile()
@@ -1020,6 +1044,16 @@ local function DrawWindowHeaderSettings()
         else
             globals.INILoadError = ('INI File %s/%s does not exist!'):format(mq.configDir, globals.INIFile)
         end
+    end
+
+    if filedialog.is_file_selector_open() then
+        filedialog.draw_file_selector(mq.configDir, '.ini')
+    end
+    if not filedialog.is_file_selector_open() and filedialog.get_filename() ~= '' then
+        globals.INIFile = filedialog.get_filename()
+        globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+        globals.INILoadError = ''
+        filedialog:reset_filename()
     end
 
     if globals.INILoadError ~= '' then
@@ -1112,8 +1146,33 @@ local function display_item_on_cursor()
     end
 end
 
+local function push_styles()
+    ImGui.PushStyleColor(ImGuiCol.WindowBg, 0, 0, 0, .9)
+    ImGui.PushStyleColor(ImGuiCol.TitleBg, .3, 0, 0, 1)
+    ImGui.PushStyleColor(ImGuiCol.TitleBgActive, .5, 0, 0, 1)
+    ImGui.PushStyleColor(ImGuiCol.FrameBg, .2, .2, .2, 1)
+    ImGui.PushStyleColor(ImGuiCol.FrameBgHovered, .3, 0, 0, 1)
+    ImGui.PushStyleColor(ImGuiCol.FrameBgActive, .3, 0, 0, 1)
+    ImGui.PushStyleColor(ImGuiCol.Button, .5, 0, 0,1)
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, .6, 0, 0,1)
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, .5, 0, 0,1)
+    ImGui.PushStyleColor(ImGuiCol.PopupBg, .1,.1,.1,1)
+    ImGui.PushStyleColor(ImGuiCol.TextDisabled, 1, 1, 1, 1)
+    ImGui.PushStyleColor(ImGuiCol.CheckMark, .5, 0, 0, 1)
+    ImGui.PushStyleColor(ImGuiCol.Separator, .4, 0, 0, 1)
+end
+
+local function pop_styles()
+    ImGui.PopStyleColor(13)
+end
+
 local MAUI = function()
     if not open then return end
+    local used_theme = false
+    if globals.Theme == 'red' then
+        push_styles()
+        used_theme = true
+    end
     open, shouldDrawUI = ImGui.Begin('MAUI (v'..globals.Version..')###MuleAssist', open)
     if shouldDrawUI then
         -- these appear to be the numbers for the window on first use... probably shouldn't rely on them.
@@ -1130,6 +1189,7 @@ local MAUI = function()
         display_item_on_cursor()
     end
     ImGui.End()
+    if used_theme then pop_styles() end
 end
 
 local function ShowHelp()
@@ -1203,5 +1263,6 @@ while not terminate do
         memspell = nil
         memgem = 0
     end
+    tloCache:clean()
     mq.delay(20)
 end

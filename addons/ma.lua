@@ -1,8 +1,8 @@
 --- @type mq
-local mq = require 'mq'
-local globals = require 'ma.globals'
-local utils = require 'ma.utils'
-local LIP = require 'ma.LIP'
+local mq = require('mq')
+local globals = require('ma.globals')
+local utils = require('ma.utils')
+local LIP = require('ma.lib.LIP')
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
 local LEMONS_INFO_INI = mq.configDir..'/Lemons_Info.ini'
@@ -249,12 +249,26 @@ local function DrawImportKAINI()
     end
 end
 
+local THEMES = {'default','red'}
+local function DrawThemeMenu()
+    ImGui.Text('Just for fun')
+    if ImGui.BeginCombo('Themes', globals.Theme) then
+        for _,j in pairs(THEMES) do
+            if ImGui.Selectable(j, j == globals.Theme) then
+                globals.Theme = j
+            end
+        end
+        ImGui.EndCombo()
+    end
+end
+
 -- Define this down here since the functions need to be defined first
 local customSections = {
     ['Raw INI']=DrawRawINIEditTab,
     ['Shared Lists']=DrawListsTab,
     ['Debug']=DrawDebugTab,
     ['Import KA INI']=DrawImportKAINI,
+    ['Theme']=DrawThemeMenu,
 }
 
 return customSections

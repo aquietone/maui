@@ -1,9 +1,9 @@
 -- Stop, don't look at this! Just some WIP stuff, nothing to see here.
 --- @type mq
-local mq = require 'mq'
-local globals = require 'ma.globals'
-local utils = require 'ma.utils'
-local LIP = require 'ma.LIP'
+local mq = require('mq')
+local globals = require('ma.globals')
+local utils = require('ma.utils')
+local LIP = require('ma.lib.LIP')
 
 local function DrawRawINIEditTab()
     if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
