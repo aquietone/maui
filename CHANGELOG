@@ -1,8 +1,10 @@
-0.3
-- Customize LIP for sorting keys
 0.2
+- Frames for list items, highlighting for selected item
+- Added some more options from the macro
+0.1
+- Customize LIP for sorting keys
 - Spell upgrade buttons
 - Some different handling for values with multiple parts
+  - not using atm...
 - Break up spell name and options after the | into separate inputs
-0.1
 - Initial recreate of original MuleAssist UI

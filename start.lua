@@ -6,6 +6,11 @@ local schema = require 'ma.schema'
 -- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
 local animItems = mq.FindTextureAnimation('A_DragItem')
+-- Blue and yellow icon border textures
+local animBlueWndPieces = mq.FindTextureAnimation('BlueIconBackground')
+animBlueWndPieces:SetTextureCell(1)
+local animYellowWndPieces = mq.FindTextureAnimation('YellowIconBackground')
+animYellowWndPieces:SetTextureCell(1)
 
 local open = true
 local shouldDrawUI = true
@@ -103,6 +108,7 @@ local function InitCheckBoxValue(value)
     if value then
         if type(value) == 'boolean' then return value end
         if type(value) == 'number' then return value ~= 0 end
+        if type(value) == 'string' and value:upper() == 'TRUE' then return true else return false end
     else
         return false
     end
@@ -419,9 +425,9 @@ local function DrawSelectedListItem(sectionName, key, value, selectedIdx)
     ImGui.Separator()
 end
 
-local function DrawPlainListButton(sectionName, key, listIdx, selectedIdx)
+local function DrawPlainListButton(sectionName, key, listIdx, selectedIdx, iconSize)
     -- INI value is set to non-spell/item
-    if ImGui.Button(listIdx..'##'..sectionName..key, 30, 30) then
+    if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
         if selectedIdx >= 0 then
             selected[selectedIdx] = listIdx
             selectedUpgrade[selectedIdx] = nil
@@ -439,21 +445,39 @@ local function DrawTooltip(text)
     end
 end
 
-local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
+local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx, yOffset)
     local iniValue = config[sectionName][key..index]
+    local iconSize = {30,30} -- default icon size
+    if type(index) == 'number' then
+        -- Largest list is 40. UI always draws 20 per row. yOffset is starting Y position for all 
+        -- elements in the 1st row. 2nd row is yOffset + 34 
+        if index <= 20 then ImGui.SetCursorPosY(yOffset) else ImGui.SetCursorPosY(yOffset+34) end
+        local x,y = ImGui.GetCursorPos()
+        if index == selected[selectedIdx] then
+            ImGui.DrawTextureAnimation(animYellowWndPieces, iconSize[1], iconSize[2])
+            -- Icon inside the frame is 26x26. Need to overlay it on top of the frame, offset by 2x2
+            ImGui.SetCursorPosX(x+2)
+            ImGui.SetCursorPosY(y+2)
+        else
+            ImGui.DrawTextureAnimation(animBlueWndPieces, iconSize[1], iconSize[2])
+            ImGui.SetCursorPosX(x+2)
+            ImGui.SetCursorPosY(y+2)
+        end
+        iconSize = {26,26}
+    end
     if iniValue and iniValue ~= 'NULL' then
         local iniValueParts = Split(iniValue,'|',1)
         -- Use first part of INI value as spell or item name to lookup icon
         if mq.TLO.Spell(iniValueParts[1])() then
             local spellIcon = mq.TLO.Spell(iniValueParts[1]).SpellIcon()
             animSpellIcons:SetTextureCell(spellIcon)
-            ImGui.DrawTextureAnimation(animSpellIcons, 30, 30)
+            ImGui.DrawTextureAnimation(animSpellIcons, iconSize[1], iconSize[2])
         elseif mq.TLO.FindItem(iniValueParts[1])() then
             local itemIcon = mq.TLO.FindItem(iniValueParts[1]).Icon()
             animItems:SetTextureCell(itemIcon-500)
-            ImGui.DrawTextureAnimation(animItems, 30, 30)
+            ImGui.DrawTextureAnimation(animItems, iconSize[1], iconSize[2])
         else
-            DrawPlainListButton(sectionName, key, index, selectedIdx)
+            DrawPlainListButton(sectionName, key, index, selectedIdx, iconSize)
         end
         DrawTooltip(iniValueParts[1])
         -- Handle clicks on spell icon animations that aren't buttons
@@ -466,7 +490,8 @@ local function DrawSpellIconOrButton(sectionName, key, index, selectedIdx)
         -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index, selectedIdx)
     else
-        DrawPlainListButton(sectionName, key, index, selectedIdx)
+        -- No INI value assigned yet for this key
+        DrawPlainListButton(sectionName, key, index, selectedIdx, iconSize)
         DrawSpellPicker(sectionName, key, index, selectedIdx)
     end
 end
@@ -494,8 +519,9 @@ local function DrawList(sectionName, key, value, selectedIdx)
         selectedUpgrade[selectedIdx] = nil
     end
     ImGui.PopItemWidth()
+    local _,yOffset = ImGui.GetCursorPos()
     for i=1,config[sectionName][key..'Size'] do
-        DrawSpellIconOrButton(sectionName, key, i, selectedIdx)
+        DrawSpellIconOrButton(sectionName, key, i, selectedIdx, yOffset)
         if i%20 ~= 0 and i < config[sectionName][key..'Size'] then
             ImGui.SameLine()
         end
@@ -549,7 +575,7 @@ local function DrawProperty(sectionName, key, value)
     if value['Type'] == 'SWITCH' then
         config[sectionName][key] = ImGui.Checkbox('##'..key, InitCheckBoxValue(config[sectionName][key]))
     elseif value['Type'] == 'SPELL' then
-        DrawSpellIconOrButton(sectionName, key, '', -1)
+        DrawSpellIconOrButton(sectionName, key, '', -1, -1)
         ImGui.SameLine()
         ImGui.PushItemWidth(350)
         config[sectionName][key] = ImGui.InputText('##textinput'..sectionName..key, config[sectionName][key])

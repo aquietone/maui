@@ -24,44 +24,44 @@ local schema = {
     },
     General={
         Properties={
-            CampRadius={
+            CampRadius={-- int (30)
                 Type='NUMBER',
                 Min=0,
             },
-            CampRadiusExceed={
+            CampRadiusExceed={-- int (400)
                 Type='NUMBER',
                 Min=0,
             },
-            ReturnToCamp={
+            ReturnToCamp={-- int (0)
                 Type='SWITCH',
             },
-            ReturnToCampAccuracy={
+            ReturnToCampAccuracy={-- int (10)
                 Type='NUMBER',
                 Min=5,
             },
-            ChaseAssist={
+            ChaseAssist={-- int (0)
                 Type='SWITCH',
             },
-            ChaseDistance={
+            ChaseDistance={-- int (25)
                 Type='NUMBER',
                 Min=0,
             },
-            MedOn={
+            MedOn={-- int (1)
                 Type='SWITCH',
             },
-            MedStart={
+            MedStart={-- string (20)
                 Type='NUMBER',
                 Min=0,
                 Max=100,
             },
-            SitToMed={
+            SitToMed={-- not from LoadIni call??
                 Type='NUMBER',
                 Min=0,
             },
-            LootOn={
+            LootOn={-- int (0)
                 Type='SWITCH',
             },
-            RezAcceptOn={--switch + extra option 0/1|96
+            RezAcceptOn={--switch + extra option, string, (0|96)
                 Type='STRING',
             },
 	    --[[
@@ -81,13 +81,13 @@ local schema = {
                 },
             },
 	    --]]
-            AcceptInvitesOn={
+            AcceptInvitesOn={-- int (1)
                 Type='SWITCH',
             },
             GroupWatchOn={--switch + extra options 0/1/2/3|MedAt%|Classes
                 Type='STRING',
             },
-            CastingInterruptOn={
+            CastingInterruptOn={-- int (0)
                 Type='SWITCH',
             },
             EQBCOn={--switch + extra option
@@ -96,20 +96,20 @@ local schema = {
             DanNetOn={--switch + extra option
                 Type='STRING',
             },
-            DanNetDelay={
+            DanNetDelay={-- int (20)
                 Type='NUMBER',
             },
-            MiscGem={
-                Type='NUMBER',
-                Min=1,
-                Max=13,
-            },
-            MiscGemLW={
+            MiscGem={-- int (8)
                 Type='NUMBER',
                 Min=1,
                 Max=13,
             },
-            MiscGemRemem={
+            MiscGemLW={-- int (0)
+                Type='NUMBER',
+                Min=1,
+                Max=13,
+            },
+            MiscGemRemem={-- int (1)
                 Type='SWITCH',
             },
             TwistOn={
@@ -121,35 +121,36 @@ local schema = {
             TwistWhat={
                 Type='STRING',
             },
-            GroupEscapeOn={
+            GroupEscapeOn={-- int (0)
                 Type='SWITCH',
             },
-            CampfireOn={
+            CampfireOn={-- int (0)
                 Type='SWITCH',
             },
-            DPSMeter={
+            DPSMeter={-- int (1)
                 Type='SWITCH',
             },
-            ScatterOn={
+            Scatter={-- int (0)
                 Type='SWITCH',
             },
-            CheerPeople={
+            CheerPeople={-- int (0)
                 Type='SWITCH',
             },
-            BeepOnNamed={
+            BuffWhileChasing={--bool (1)
                 Type='SWITCH',
             },
-            BuffWhileChasing={
+            SwitchWithMA={-- bool (FALSE)
                 Type='SWITCH',
-            }
-            --Role
-            --GemStuckAbility
-            --HoTTOn
-            --MoveCloserIfNoLOS
-            --IRCOn
-            --CastRetries
-            --SwitchWithMA
-            --TravelOnHorse
+            },
+            CastRetries={ -- new beta int (3)
+                Type='NUMBER',
+            },
+            --Role string (Assist)
+            --GemStuckAbility string (NULL)
+            --HoTTOn int (0)
+            --MoveCloserIfNoLOS int (0)
+            --IRCOn int (0)
+            --TravelOnHorse bool (FALSE)
         }
     },
     SpellSet={
@@ -198,10 +199,13 @@ local schema = {
             UseMQ2Melee={
                 Type='SWITCH',
             },
-            Autohide={
+            Autohide={ -- rogue only
                 Type='SWITCH',
             },
             BeforeCombat={
+                Type='SPELL',
+            },
+            RogueTimerEight={-- new beta? rogue only
                 Type='SPELL',
             },
             TargetSwitchingOn={
@@ -210,7 +214,9 @@ local schema = {
             DismountDuringFights={
                 Type='SWITCH',
             },
-            --TankAllMobs
+            TankAllMobs={ -- new beta?
+                Type='SWITCH'
+            }
         },
     },
     DPS={
@@ -242,6 +248,9 @@ local schema = {
                 Min=0,
                 Max=2,
             },
+            StayAwayToCast={-- new beta?
+                Type='SWITCH'
+            },
         },
     },
     Buffs={
@@ -270,7 +279,7 @@ local schema = {
             BegOn={
                 Type='SWITCH',
             },
-            BegPermissions={
+            BegPermission={
                 Type='STRING',
             },
             Beg={
@@ -278,6 +287,7 @@ local schema = {
                 Max=20,
                 Conditions=false,
             },
+            -- BuffCacheingDelay int 300
         }
     },
     Heals={
@@ -318,7 +328,7 @@ local schema = {
             },
         },
         Properties={
-            Cures={
+            Cures={-- loaded once without conds and once with? no COn switch tho
                 Type='LIST',
                 Max=5,
                 Conditions=true,
@@ -410,7 +420,20 @@ local schema = {
             MoveWhenHit={
                 Type='SWITCH',
             },
+            PetToysSize={
+                Type='NUMBER',
+                Max=6,
+            },
+            PetToysOn={
+                Type='SWITCH',
+            },
+            PetToys={
+                Type='STRING',
+            },
+            --PetToysGave=internal?
             --PetToysSize
+            --PetForceHealOnMed int
+            --PetBehind bool
         }
     },
     Pull={
@@ -464,6 +487,15 @@ local schema = {
                 Min=0,
                 Max=360,
             },
+            -- CheckForMemblurredMobsInCamp int (0)
+            -- PullCond string (TRUE)
+            -- PrePullCond string (TRUE)
+            -- PullNamedsFirst int (0)
+            -- ActNatural int (1)
+            -- UseCalm int (0)
+            -- CalmWith string
+            -- CalmRadius int
+            -- GrabDeadGroupMembers int (1)
         },
     },
     Merc={
@@ -513,22 +545,22 @@ local schema = {
             },
         },
         Properties={
-            AFKGMAction={
+            AFKGMAction={-- int (1)
                 Type='NUMBER',
                 Min=0,
                 Max=4,
             },
-            AFKPCRadius={
+            AFKPCRadius={-- int (500)
                 Type='NUMBER',
                 Min=0,
             },
-            CampOnDeath={
+            CampOnDeath={-- int (0)
                 Type='SWITCH',
             },
-            ClickBackToCamp={
+            ClickBackToCamp={-- int (0)
                 Type='SWITCH',
             },
-            BeepOnNamed={
+            BeepOnNamed={-- int (0)
                 Type='SWITCH',
             },
         },
@@ -596,8 +628,39 @@ local schema = {
             },
         },
     },
+    Bandolier={
+        Controls={
+            On={
+                Type='SWITCH',
+            },
+            COn=true,
+        },
+        Properties={
+            Bandolier={
+                Type='LIST',
+                Max=5,
+                Conditions=true,
+            },
+            BandolierPull={
+                Type='STRING',
+            }
+        },
+    },
+    Rogue={
+        Classes={
+            rog=1,
+        },
+        Properties={
+            RogCorpseRetrieval={
+                Type='SWITCH',
+            },
+            RogCorpseRadius={
+                Type='NUMBER',
+            },
+        },
+    },
     -- Gmail
-    -- Bandolier
+      -- GmailOn, GMailSize, GMail
 }
 
 return schema
