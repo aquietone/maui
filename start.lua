@@ -54,6 +54,10 @@ local DEBUG = {all=false,dps=false,heal=false,buff=false,cast=false,combat=false
 local debugCaptureTime = '60'
 
 -- Helper functions
+local function printf(...)
+    print(string.format(...))
+end
+
 local function Split(input, sep, limit, bRegexp)
     assert(sep ~= '')
     assert(limit == nil or limit >= 1)
@@ -114,11 +118,12 @@ local function FindINIFileName()
     else
         local fileLevel = myLevel-1
         repeat
-            local fileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
-            if FileExists(fileName) then
-                local targetFileName = mq.configDir..'/'..MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
-                CopyFile(fileName, targetFileName)
-                return MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+            local fileName = MA_INI_LVL_PATTERN:format(myServer, myName, fileLevel)
+            if FileExists(mq.configDir..'/'..fileName) then
+                local targetFileName = MA_INI_LVL_PATTERN:format(myServer, myName, myLevel)
+                CopyFile(mq.configDir..'/'..fileName, mq.configDir..'/'..targetFileName)
+                printf('Copying %s to %s', fileName, targetFileName)
+                return targetFileName
             end
             fileLevel = fileLevel-1
         until fileLevel == myLevel-10
@@ -408,10 +413,6 @@ local function DrawSelectedSpellUpgradeButton(spell)
         end
     end
     return upgradeValue
-end
-
-local function printf(...)
-    print(string.format(...))
 end
 
 local function CheckInputType(key, value, typestring, inputtype)
