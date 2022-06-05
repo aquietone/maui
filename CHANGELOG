@@ -1,3 +1,8 @@
+0.7.1
+- Add support for dropping items into MAUI in places that accept items, like the DPS list, pet focus, etc.
+- Fix drag/drop entering into selected item view of the drop target
+0.7.0
+- Add drag/drop support for rearranging list entries in sections like DPS, Buffs, Heals, etc.
 0.6.1
 - Add tostring in a couple spots where LIP might give us a number when we wanted a string
 - Change LIP to write keys in a more user friendly order
