@@ -68,6 +68,8 @@ end
 local spells, altAbilities, discs = {categories={}},{types={}},{categories={}}
 local aatypes = {'General','Archtype','Class','Special','Focus','Merc'}
 
+local useRankNames = false
+
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
 
 --local customSections = require('ma.addons.'..globals.CurrentSchema)
@@ -349,7 +351,11 @@ local function DrawSpellPicker(sectionName, key, index)
                                     -- spell[1]=level, spell[2]=name
                                     SetSpellTextColor(spell[2])
                                     if ImGui.MenuItem(spell[1]..' - '..spell[2]..'##'..sectionName..key..subcategory) then
-                                        valueParts[1] = spell[2]
+                                        if useRankNames then
+                                            valueParts[1] = spell[3]
+                                        else
+                                            valueParts[1] = spell[2]
+                                        end
                                         selectedUpgrade = nil
                                     end
                                     ImGui.PopStyleColor()
@@ -887,6 +893,9 @@ end
 
 -- Draw an INI section tab
 local function DrawSection(sectionName, sectionProperties)
+    if sectionName == 'Buffs' then
+        useRankNames = true
+    end
     if not globals.Config[sectionName] then
         globals.Config[sectionName] = {}
     end
@@ -907,30 +916,32 @@ local function DrawSection(sectionName, sectionProperties)
                     DrawProperty(sectionName, key, value)
                 end
             end
-        else
-            if selectedListItem[1] then
-                if ImGui.Button('Back to List') then
-                    selectedListItem = {nil, 0}
-                    selectedUpgrade = nil
-                else
-                    DrawSpellIconOrButton(sectionName, selectedListItem[1], selectedListItem[2])
-                    DrawSelectedListItem(sectionName, selectedListItem[1], sectionProperties['Properties'][selectedListItem[1]])
-                end
+        end
+        if selectedListItem[1] then
+            if ImGui.Button('Back to List') then
+                selectedListItem = {nil, 0}
+                selectedUpgrade = nil
             else
-                -- Draw List properties before general properties
-                for key,value in pairs(sectionProperties['Properties']) do
-                    if value['Type'] == 'LIST' then
-                        DrawList(sectionName, key, value)
-                    end
+                DrawSpellIconOrButton(sectionName, selectedListItem[1], selectedListItem[2])
+                DrawSelectedListItem(sectionName, selectedListItem[1], sectionProperties['Properties'][selectedListItem[1]])
+            end
+        else
+            -- Draw List properties before general properties
+            for key,value in pairs(sectionProperties['Properties']) do
+                if value['Type'] == 'LIST' then
+                    DrawList(sectionName, key, value)
                 end
-                -- Generic properties last
-                for key,value in pairs(sectionProperties['Properties']) do
-                    if value['Type'] ~= 'LIST' then
-                        DrawProperty(sectionName, key, value)
-                    end
+            end
+            -- Generic properties last
+            for key,value in pairs(sectionProperties['Properties']) do
+                if value['Type'] ~= 'LIST' then
+                    DrawProperty(sectionName, key, value)
                 end
             end
         end
+    end
+    if sectionName == 'Buffs' then
+        useRankNames = false
     end
     ImGui.EndChild()
 end
