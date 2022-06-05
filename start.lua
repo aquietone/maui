@@ -41,6 +41,14 @@ local Split = function(input, sep)
     return t
 end
 
+local JoinStrings = function(t, sep, start)
+    local result = t[start]
+    for i=start+1,#t do
+        result = result..'|'..t[i]
+    end
+    return result
+end
+
 local ReadRawINIFile = function()
     local f = io.open(mq.configDir..'\\'..INIFile, 'r')
     local contents = f:read('*a')
@@ -309,7 +317,7 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     -- split the value so we can update spell name and stuff after the | individually
     local valueParts = Split(config[sectionName][valueKey])
     if not valueParts[1] then valueParts[1] = '' end
-    if not valueParts[2] then valueParts[2] = '' end
+    local optionsInput = JoinStrings(valueParts, '|', 2) or ''
 
     ImGui.Separator()
     ImGui.Text(string.format('%s.%s%d', sectionName, key, selected[selectedIdx]))
@@ -322,7 +330,7 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
     ImGui.SameLine()
     ImGui.SetCursorPosX(175)
     -- the rest of the stuff after the first |, classes, percents, oog, etc
-    valueParts[2] = ImGui.InputText('##'..sectionName..valueKey..'options', valueParts[2])
+    optionsInput = ImGui.InputText('##'..sectionName..valueKey..'options', optionsInput)
     if value['Conditions'] then
         ImGui.Text('Condition: ')
         ImGui.SameLine()
@@ -347,11 +355,14 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
             end
         end
     end
-    config[sectionName][valueKey] = table.concat(valueParts, '|')
-    if config[sectionName][valueKey] == '|' then
+    if valueParts[1] and string.len(valueParts[1]) > 0 then
+        config[sectionName][valueKey] = valueParts[1]
+        if optionsInput and string.len(optionsInput) > 0 then
+            config[sectionName][valueKey] = config[sectionName][valueKey]..'|'..optionsInput:gsub('|$','')
+        end
+    else
         config[sectionName][valueKey] = ''
     end
-    config[sectionName][valueKey] = config[sectionName][valueKey]:gsub('|$','')
     ImGui.Separator()
 end
 
