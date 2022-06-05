@@ -134,11 +134,11 @@ local function ConvertListProperty(section, imported_config, section_name, prop_
             local idx = tostring(i)
             local value = imported_config[section_name][prop_name..idx]
             -- Some ugly code to shuffle conditions around from KA's KConditions to the appropriate spots
-            if value:find('|Cond') then
+            if value:lower():find('|cond') then
                 local valueParts = utils.Split(value, '|')
                 for _,part in ipairs(valueParts) do
-                    if part:find('Cond') then
-                        local condition = imported_config['KConditions'][part]
+                    if part:lower():find('cond') then
+                        local condition = imported_config['KConditions'][part:lower()]
                         section[prop_name..'Cond'..idx] = condition
                         value,_ = value:gsub('|'..part, '')
                         cond_found = true
@@ -184,33 +184,63 @@ local function ConvertINISection(imported_config, section_name)
     return section
 end
 
+local function PrepareConditions(imported_config)
+    if imported_config['KConditions'] then
+        for key,_ in pairs(imported_config['KConditions']) do
+            if key:find('Cond') then
+                imported_config['KConditions'][key:lower()] = imported_config['KConditions'][key]
+            end
+        end
+    end
+end
+
 local function ConvertINI(imported_config)
     local ok = true
     local config = {}
 
+    PrepareConditions(imported_config)
     for _,section_name in ipairs(globals.Schema.Sections) do
         if globals.Schema[section_name] and imported_config[section_name] then
             config[section_name] = ConvertINISection(imported_config, section_name)
         end
     end
 
+    -- What sort of failure conditions might there be for importing an existing KA INI file?
     return ok, config
 end
 
 local ImportINIFile = ''
+local ImportRan = false
+local ImportMessage = ''
+local ImportSucceeded = false
 local function DrawImportKAINI()
     ImGui.Text('Enter the name of a KissAssist INI File to import... (Ex. KissAssist_Toonname.ini)')
     ImportINIFile = ImGui.InputText('Import INI File Name', ImportINIFile)
     if ImGui.Button('Import INI') then
+        ImportRan = true
         if utils.FileExists(mq.configDir..'/'..ImportINIFile) then
             local imported_config = LIP.load(mq.configDir..'/'..ImportINIFile, false)
             print('Importing configuration from KA to MA using INI file: '..ImportINIFile)
             local ok, result = ConvertINI(imported_config)
             if ok then
                 globals.Config = result
+                ImportMessage = 'Import Succeeded! Run the macro once to initialize any remaining INI values, then reload the INI.'
+                ImportSucceeded = true
             else
                 print('Import failed!')
+                ImportMessage = 'Import failed!'
+                ImportSucceeded = false
             end
+        else
+            ImportSucceeded = false
+            ImportMessage = 'Failure! File does not exist.'
+        end
+    end
+    if ImportRan then
+        if ImportSucceeded then
+            ImGui.TextColored(0, 1, 0, 1, ImportMessage)
+        else
+            ImGui.TextColored(1, 0, 0, 1, ImportMessage)
         end
     end
 end
