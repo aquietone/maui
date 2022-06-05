@@ -126,11 +126,101 @@ local function DrawDebugTab()
     end
 end
 
+local function ConvertListProperty(section, imported_config, section_name, prop_name, prop_config)
+    local cond_found = false
+    section[prop_name..'Size'] = imported_config[section_name][prop_name..'Size']
+    for i=1,prop_config.Max do
+        if imported_config[section_name][prop_name..tostring(i)] then
+            local idx = tostring(i)
+            local value = imported_config[section_name][prop_name..idx]
+            -- Some ugly code to shuffle conditions around from KA's KConditions to the appropriate spots
+            if value:find('|Cond') then
+                local valueParts = utils.Split(value, '|')
+                for _,part in ipairs(valueParts) do
+                    if part:find('Cond') then
+                        local condition = imported_config['KConditions'][part]
+                        section[prop_name..'Cond'..idx] = condition
+                        value,_ = value:gsub('|'..part, '')
+                        cond_found = true
+                    end
+                end
+            end
+            section[prop_name..idx] = value
+        end
+    end
+    if cond_found then
+        -- If any values in the list had a condition, enable conditions for the section
+        section[section_name..'COn'] = true
+        for i=1,prop_config.Max do
+            -- If any value in the list had no condition, default the condition to "TRUE"
+            local idx = tostring(i)
+            if section[prop_name..idx] and not section[prop_name..'Cond'..idx] then
+                section[prop_name..'Cond'..idx] = "TRUE"
+            end
+        end
+    else
+        section[section_name..'COn'] = false
+    end
+end
+
+local function ConvertINISection(imported_config, section_name)
+    local section = {}
+    if globals.Schema[section_name].Controls then
+        for control_name, _ in pairs(globals.Schema[section_name].Controls) do
+            if control_name ~= 'COn' then
+                section[section_name..control_name] = imported_config[section_name][section_name..control_name]
+            end
+        end
+    end
+    for prop_name, prop_config in pairs(globals.Schema[section_name].Properties) do
+        if prop_config.Type == 'LIST' then
+            ConvertListProperty(section, imported_config, section_name, prop_name, prop_config)
+        else
+            if imported_config[section_name][prop_name] then
+                section[prop_name] = imported_config[section_name][prop_name]
+            end
+        end
+    end
+    return section
+end
+
+local function ConvertINI(imported_config)
+    local ok = true
+    local config = {}
+
+    for _,section_name in ipairs(globals.Schema.Sections) do
+        if globals.Schema[section_name] and imported_config[section_name] then
+            config[section_name] = ConvertINISection(imported_config, section_name)
+        end
+    end
+
+    return ok, config
+end
+
+local ImportINIFile = ''
+local function DrawImportKAINI()
+    ImGui.Text('Enter the name of a KissAssist INI File to import... (Ex. KissAssist_Toonname.ini)')
+    ImportINIFile = ImGui.InputText('Import INI File Name', ImportINIFile)
+    if ImGui.Button('Import INI') then
+        if utils.FileExists(mq.configDir..'/'..ImportINIFile) then
+            local imported_config = LIP.load(mq.configDir..'/'..ImportINIFile, false)
+            print('Importing configuration from KA to MA using INI file: '..ImportINIFile)
+            local ok, result = ConvertINI(imported_config)
+            if ok then
+                globals.Config = result
+            else
+                print('Import failed!')
+            end
+        end
+    end
+end
+
 -- Define this down here since the functions need to be defined first
 local customSections = {
     ['Raw INI']=DrawRawINIEditTab,
     ['Shared Lists']=DrawListsTab,
-    ['Debug']=DrawDebugTab
+    ['Debug']=DrawDebugTab,
+    ['Import KA INI']=DrawImportKAINI,
 }
 
 return customSections

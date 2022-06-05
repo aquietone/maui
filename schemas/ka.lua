@@ -1,3 +1,4 @@
+-- Stop, don't look at this! Just some WIP stuff, nothing to see here.
 local schema = {
     StartCommand = '/mac kissassist assist ${Group.MainAssist}',
     INI_PATTERNS = {

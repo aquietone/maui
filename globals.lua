@@ -1,4 +1,4 @@
-local schemas = {'ma', 'ka', 'test'}
+local schemas = {'ma', 'ka',}
 
 local globals = {
     Version = '0.6.0',

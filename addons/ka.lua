@@ -1,3 +1,4 @@
+-- Stop, don't look at this! Just some WIP stuff, nothing to see here.
 --- @type mq
 local mq = require 'mq'
 local globals = require 'ma.globals'
