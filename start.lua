@@ -1203,6 +1203,10 @@ local function DrawWindowHeaderSettings()
         ImGui.SameLine()
         ImGui.Text(string.format('Role: %s', mq.TLO.Macro.Variable('Role')()))
     end
+    if globals.Config.error then
+        ImGui.SameLine()
+        ImGui.TextColored(1,0,0,1,globals.Config.error)
+    end
     ImGui.Separator()
 end
 
@@ -1310,7 +1314,7 @@ local function NewSpellMemmed(line, spell)
         AddSpellToMap(spell)
     end
 
-    SortMap()
+    SortSpellMap()
 end
 
 -- Load INI into table as well as raw content

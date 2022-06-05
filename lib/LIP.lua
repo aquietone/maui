@@ -51,6 +51,10 @@ function LIP.load(fileName, initNilValues)
 		-- read keys with no value
 		local param, value = line:match("^([%w|_'.%s-]+)=(.-)$");
 		if(param and value ~= nil)then
+			if not section then
+				print('\at[\ax\ayMAUI\ax\at]\ax \arERROR: Invalid section header in INI file.\ax')
+				return {error='Invalid section header in INI file.'}
+			end
 			if(tonumber(value))then
 				value = tonumber(value);
 			elseif(value == 'true')then
@@ -63,6 +67,10 @@ function LIP.load(fileName, initNilValues)
 			end
 			data[section][param] = value;
 		elseif param and initNilValues then
+			if not section then
+				print('\at[\ax\ayMAUI\ax\at]\ax \arERROR: Invalid section header in INI file.\ax')
+				return {error='Invalid section header in INI file.'}
+			end
 			data[section][param] = 0
 		end
 	end
