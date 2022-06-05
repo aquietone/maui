@@ -3,6 +3,7 @@ require 'ImGui'
 local LIP = require 'ma.LIP'
 local schema = require 'ma.schema'
 
+-- Animations for drawing spell/item icons
 local animSpellIcons = mq.FindTextureAnimation('A_SpellIcons')
 local animItems = mq.FindTextureAnimation('A_DragItem')
 
@@ -14,14 +15,18 @@ local selected = 0
 local StartCommand = '/mac muleassist assist ${Group.MainAssist}'
 
 local INIFile = nil
+local INIFileContents = nil
 local config = nil
 local myServer = mq.TLO.EverQuest.Server()
 local myName = mq.TLO.Me.CleanName()
 local myLevel = mq.TLO.Me.Level()
 local myClass = mq.TLO.Me.Class.ShortName():lower()
 
+-- Storage for spell/AA/disc picker
 local spellIter, aaIter, discIter = 1,1,1
 local spells, altAbilities, discs = {},{},{}
+
+-- Helper functions
 
 local Split = function(input, sep)
     if sep == nil then
@@ -32,6 +37,19 @@ local Split = function(input, sep)
         table.insert(t, str)
     end
     return t
+end
+
+local ReadRawINIFile = function()
+    local f = io.open(mq.configDir..'\\'..INIFile, 'r')
+    local contents = f:read('*a')
+    io.close(f)
+    return contents
+end
+
+local WriteRawINIFile = function(contents)
+    local f = io.open(mq.configDir..'\\'..INIFile, 'w')
+    f:write(contents)
+    io.close(f)
 end
 
 local FileExists = function(path)
@@ -56,12 +74,18 @@ local FindINIFileName = function()
     return nil
 end
 
+-- ImGui functions
+
 local DrawSpellPicker = function(sectionName, key, index)
+    -- Right click context menu popup on list buttons
     if ImGui.BeginPopupContextItem('##rcmenu'..sectionName..key..index) then
+        -- Top level 'Spells' menu item
         if ImGui.BeginMenu('Spells##rcmenu'..sectionName..key) then
             for category,subcategories in pairs(spells) do
+                -- Spell Subcategories submenu
                 if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
                     for subcategory,catspells in pairs(subcategories) do
+                        -- Subcategory Spell menu
                         if ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
                             for i,spell in ipairs(catspells) do
                                 if ImGui.MenuItem(spell..'##'..sectionName..key..subcategory) then
@@ -76,6 +100,7 @@ local DrawSpellPicker = function(sectionName, key, index)
             end
             ImGui.EndMenu()
         end
+        -- Top level 'AAs' menu item
         if ImGui.BeginMenu('AAs##rcmenu'..sectionName..key) then
             for _,altAbility in ipairs(altAbilities) do
                 if ImGui.MenuItem(altAbility..'##aa'..sectionName..key) then
@@ -84,10 +109,12 @@ local DrawSpellPicker = function(sectionName, key, index)
             end
             ImGui.EndMenu()
         end
+        -- TODO: also add discs
         ImGui.EndPopup()
     end
 end
 
+-- Draw the value and condition of the selected list item
 local DrawSelectedItem = function(sectionName, key, value)
     ImGui.Separator()
     ImGui.Text(string.format('%s.%s%d', sectionName, key, selected))
@@ -114,6 +141,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
     local iniValue = config[sectionName][key..index]
     if iniValue and iniValue ~= 'NULL' then
         local iniValueParts = Split(iniValue,'|')
+        -- Use first part of INI value as spell or item name to lookup icon
         if mq.TLO.Spell(iniValueParts[1])() then
             local spellIcon = mq.TLO.Spell(iniValueParts[1]).SpellIcon()
             animSpellIcons:SetTextureCell(spellIcon)
@@ -123,7 +151,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, 30, 30)
         else
-            -- Item is set to non-spell/item
+            -- INI value is set to non-spell/item
             if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
                 if setSelected then selected = index end
             end
@@ -138,6 +166,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
             if setSelected then selected = index end
         end
+        -- Spell picker context menu on right click button
         DrawSpellPicker(sectionName, key, index)
     else
         if ImGui.Button(index..'##'..sectionName..key, 30, 30) then
@@ -147,6 +176,7 @@ local DrawSpellIconOrButton = function(sectionName, key, index, setSelected)
     end
 end
 
+-- Draw 0..N buttons based on value of XYZSize input
 local DrawList = function(sectionName, key, value)
     ImGui.Text(key..'Size: ')
     ImGui.SameLine()
@@ -176,6 +206,7 @@ local DrawList = function(sectionName, key, value)
     end
 end
 
+-- convert INI 0/1 to true/false for ImGui checkboxes
 local InitCheckBoxValue = function(value)
     if not value or value == 0 or value == 'NULL' then
         return false
@@ -185,6 +216,7 @@ local InitCheckBoxValue = function(value)
     return value
 end
 
+-- Draw a generic section key/value property
 local DrawProperty = function(sectionName, key, value)
     ImGui.Text(key..': ')
     ImGui.SameLine()
@@ -211,6 +243,7 @@ local DrawProperty = function(sectionName, key, value)
     end
 end
 
+-- Draw main On/Off switches for an INI section
 local DrawSectionControlSwitches = function(sectionName, sectionProperties)
     if sectionProperties['On'] then
         config[sectionName][sectionName..'On'] = ImGui.Checkbox(sectionName..'On', InitCheckBoxValue(config[sectionName][sectionName..'On']))
@@ -222,20 +255,22 @@ local DrawSectionControlSwitches = function(sectionName, sectionProperties)
     ImGui.Separator()
 end
 
+-- Draw an INI section tab
 local DrawSection = function(sectionName, sectionProperties)
-    -- List properties first
     if not config[sectionName] then
         config[sectionName] = {}
     end
+    -- Draw main section control switches first
     if sectionProperties['Controls'] then
         DrawSectionControlSwitches(sectionName, sectionProperties['Controls'])
     end
+    -- Draw List properties before general properties
     for key,value in pairs(sectionProperties['Properties']) do
         if value['Type'] == 'LIST' then
             DrawList(sectionName, key, value)
         end
     end
-    -- Non-list properties second
+    -- Generic properties last
     for key,value in pairs(sectionProperties['Properties']) do
         if value['Type'] ~= 'LIST' then
             DrawProperty(sectionName, key, value)
@@ -261,71 +296,72 @@ local function Save()
     LIP.save(mq.configDir..'\\'..INIFile, config)
 end
 
-local ReadRawINIFile = function()
-    local f = io.open(mq.configDir..'\\'..INIFile, 'r')
-    local contents = f:read('*a')
-    io.close(f)
-    return contents
+local DrawRawINIEditTab = function()
+    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+        INIFileContents = ReadRawINIFile()
+    end
+    if ImGui.Button('Refresh Raw INI##rawini') then
+        INIFileContents = ReadRawINIFile()
+    end
+    ImGui.SameLine()
+    if ImGui.Button('Save Raw INI##rawini') then
+        WriteRawINIFile(INIFileContents)
+        config = LIP.load(mq.configDir..'\\'..INIFile)
+    end
+    local x,y = ImGui.GetContentRegionAvail()
+    INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents, x-15, y-15, ImGuiInputTextFlags.None)
+    ImGui.EndTabItem()
 end
-local function WriteRawINIFile(contents)
-    local f = io.open(mq.configDir..'\\'..INIFile, 'w')
-    f:write(contents)
-    io.close(f)
+
+local DrawWindowHeaderSettings = function()
+    ImGui.Text('INI File: ')
+    ImGui.SameLine()
+    INIFile,_ = ImGui.InputText('##INIInput', INIFile)
+    ImGui.SameLine()
+    if ImGui.Button('Save INI') then
+        Save()
+        INIFileContents = ReadRawINIFile()
+    end
+    ImGui.SameLine()
+    if ImGui.Button('Reload INI') then
+        config = LIP.load(mq.configDir..'\\'..INIFile)
+    end
+    ImGui.Separator()
+    ImGui.Text('Start Command: ')
+    ImGui.SameLine()
+    StartCommand,_ = ImGui.InputText('##StartCommand', StartCommand)
+    ImGui.SameLine()
+    if ImGui.Button('Start Macro') then
+        mq.cmd(StartCommand)
+    end
+    ImGui.Separator()
 end
-local INIFileContents = nil
+
+local DrawWindowTabBar = function()
+    if ImGui.BeginTabBar('Settings') then
+        for sectionName,sectionProperties in pairs(schema) do
+            if not schema[sectionName].Classes or schema[sectionName].Classes[myClass] then
+                if ImGui.BeginTabItem(sectionName) then
+                    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+                        selected = 0
+                    end
+                    DrawSection(sectionName, sectionProperties)
+                    ImGui.EndTabItem()
+                end
+            end
+        end
+        if ImGui.BeginTabItem('Raw') then
+            DrawRawINIEditTab()
+        end
+    end
+end
+
 local MAUI = function()
     open, shouldDrawUI = ImGui.Begin('MuleAssist', open)
     if shouldDrawUI then
-        ImGui.Text('INI File: ')
-        ImGui.SameLine()
-        INIFile,_ = ImGui.InputText('##INIInput', INIFile)
-        ImGui.SameLine()
-        if ImGui.Button('Save INI') then
-            Save()
-            INIFileContents = ReadRawINIFile()
-        end
-        ImGui.SameLine()
-        if ImGui.Button('Reload INI') then
-            config = LIP.load(mq.configDir..'\\'..INIFile)
-        end
-        ImGui.Separator()
-        ImGui.Text('Start Command: ')
-        ImGui.SameLine()
-        StartCommand,_ = ImGui.InputText('##StartCommand', StartCommand)
-        ImGui.SameLine()
-        if ImGui.Button('Start Macro') then
-            mq.cmd(StartCommand)
-        end
-        ImGui.Separator()
-        if ImGui.BeginTabBar('Settings') then
-            for sectionName,sectionProperties in pairs(schema) do
-                if not schema[sectionName].Classes or schema[sectionName].Classes[myClass] then
-                    if ImGui.BeginTabItem(sectionName) then
-                        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                            selected = 0
-                        end
-                        DrawSection(sectionName, sectionProperties)
-                        ImGui.EndTabItem()
-                    end
-                end
-            end
-            if ImGui.BeginTabItem('Raw') then
-                if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                    INIFileContents = ReadRawINIFile()
-                end
-                if ImGui.Button('Refresh Raw INI##rawini') then
-                    INIFileContents = ReadRawINIFile()
-                end
-                ImGui.SameLine()
-                if ImGui.Button('Save Raw INI##rawini') then
-                    WriteRawINIFile(INIFileContents)
-                    config = LIP.load(mq.configDir..'\\'..INIFile)
-                end
-                local x,y = ImGui.GetContentRegionAvail()
-                INIFileContents,_ = ImGui.InputTextMultiline("##rawinput", INIFileContents, x-15, y-15, ImGuiInputTextFlags.None)
-                ImGui.EndTabItem()
-            end
-        end
+        DrawWindowHeaderSettings()
+        DrawWindowTabBar()
+        
         if not open then
             terminate = true
         end
@@ -333,6 +369,7 @@ local MAUI = function()
     ImGui.End()
 end
 
+-- Load INI into table as well as raw content
 INIFile = FindINIFileName()
 if INIFile then
     config = LIP.load(mq.configDir..'\\'..INIFile)
@@ -342,6 +379,7 @@ else
     config = {}
 end
 
+-- Sort spells by level
 local SpellSorter = function(a, b)
     if mq.TLO.Spell(a).Level() < mq.TLO.Spell(b).Level() then
         return false
@@ -351,7 +389,7 @@ local SpellSorter = function(a, b)
         return false
     end
 end
-
+-- Build spell tree for picking spells
 repeat
     local spell = mq.TLO.Me.Book(spellIter)
     if not spells[spell.Category()] then
@@ -370,13 +408,14 @@ for i,j in pairs(spells) do
         table.sort(spells[i][k], SpellSorter)
     end
 end
-
+-- TODO: what's the right way to loop through activated abilities?
 for aaIter=1,10000 do
     if mq.TLO.Me.AltAbility(aaIter)() and mq.TLO.Me.AltAbility(aaIter).Spell() then
         table.insert(altAbilities, mq.TLO.Me.AltAbility(aaIter).Name())
     end
     aaIter = aaIter + 1
 end
+-- TODO: do the same thing for disciplines
 
 mq.imgui.init('MuleAssist', MAUI)
 
