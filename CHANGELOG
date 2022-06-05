@@ -1,3 +1,7 @@
+0.8.2
+- Add Rogue to list of sections to display tabs for
+- Check INI file exists when clicking reload
+- Display error if trying to load INI file that does not exist
 0.8.1
 - Memorize spell button added to right click menu on abilities.
 - A couple of small schema fixes

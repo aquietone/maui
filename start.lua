@@ -856,7 +856,7 @@ local function DrawSplitter(thickness, size0, min_size0)
     local x,y = ImGui.GetCursorPos()
     local delta = 0
     ImGui.SetCursorPosX(x + size0)
-    
+
     ImGui.PushStyleColor(ImGuiCol.Button, 0, 0, 0, 0)
     ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0, 0, 0)
     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0.6, 0.6, 0.6, 0.1)
@@ -867,7 +867,7 @@ local function DrawSplitter(thickness, size0, min_size0)
 
     if ImGui.IsItemActive() then
         delta,_ = ImGui.GetMouseDragDelta()
-        
+
         if delta < min_size0 - size0 then
             delta = min_size0 - size0
         end
@@ -960,9 +960,10 @@ local function SetSchemaVars(selectedSchema)
     globals.CurrentSchema = selectedSchema
     globals.INIFile = utils.FindINIFile()
     selectedSection = 'General'
-    if globals.INIFile then
+    if globals.INIFile and utils.FileExists(mq.configDir..'/'..globals.INIFile) then
         globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
         globals.INIFileContents = utils.ReadRawINIFile()
+        globals.INILoadError = ''
     else
         globals.INIFile = ''
         globals.Config = {}
@@ -1013,7 +1014,16 @@ local function DrawWindowHeaderSettings()
         if globals.INIFile:sub(-string.len('.ini')) ~= '.ini' then
             globals.INIFile = globals.INIFile .. '.ini'
         end
-        globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+        if utils.FileExists(mq.configDir..'/'..globals.INIFile) then
+            globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
+            globals.INILoadError = ''
+        else
+            globals.INILoadError = ('INI File %s/%s does not exist!'):format(mq.configDir, globals.INIFile)
+        end
+    end
+
+    if globals.INILoadError ~= '' then
+        ImGui.TextColored(1,0,0,1,globals.INILoadError)
     end
 
     local match_found = false
@@ -1157,9 +1167,10 @@ end
 
 -- Load INI into table as well as raw content
 globals.INIFile = globals.MAUI_Config['INIFile'] or utils.FindINIFile()
-if globals.INIFile then
+if globals.INIFile and utils.FileExists(mq.configDir..'/'..globals.INIFile) then
     globals.Config = LIP.load(mq.configDir..'/'..globals.INIFile)
     globals.INIFileContents = utils.ReadRawINIFile()
+    globals.INILoadError = ''
 else
     globals.INIFile = globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)
     globals.Config = {}

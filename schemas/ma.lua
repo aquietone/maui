@@ -29,6 +29,7 @@ local schema = {
         'Bandolier',
         'Cures',
         'GoM',
+        'Rogue',
         'Merc',
         'AFKTools',
         'GMail',
