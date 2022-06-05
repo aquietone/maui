@@ -1,46 +1,83 @@
 local schema = {
     General={
         Properties={
-            CampRadius={},
-            CampRadiusExceed={},
+            CampRadius={
+                Type='NUMBER',
+                Min=0
+            },
+            CampRadiusExceed={
+                Type='NUMBER',
+                Min=0
+            },
             ReturnToCamp={
                 Type='SWITCH'
             },
-            ReturnToCampAccuracy={},
-            ChaseAssist={},
-            ChaseDistance={},
+            ReturnToCampAccuracy={
+                Type='NUMBER',
+                Min=5
+            },
+            ChaseAssist={
+                Type='SWITCH'
+            },
+            ChaseDistance={
+                Type='NUMBER',
+                Min=0
+            },
             MedOn={
                 Type='SWITCH'
             },
-            MedStart={},
-            SitToMed={},
+            MedStart={
+                Type='NUMBER',
+                Min=0,
+                Max=100
+            },
+            SitToMed={
+                Type='NUMBER',
+                Min=0
+            },
             LootOn={
                 Type='SWITCH'
             },
-            RezAcceptOn={},
+            RezAcceptOn={--switch + extra option 0/1|96
+                Type='STRING'
+            },
             AcceptInvitesOn={
                 Type='SWITCH'
             },
-            GroupWatchOn={
-                Type='SWITCH'
+            GroupWatchOn={--switch + extra options 0/1/2/3|MedAt%|Classes
+                Type='STRING'
             },
             CastingInterruptOn={
                 Type='SWITCH'
             },
-            EQBCOn={
+            EQBCOn={--switch + extra option
+                Type='STRING'
+            },
+            DanNetOn={--switch + extra option
+                Type='STRING'
+            },
+            MiscGem={
+                Type='NUMBER',
+                Min=1,
+                Max=13
+            },
+            MiscGemLW={
+                Type='NUMBER',
+                Min=1,
+                Max=13
+            },
+            MiscGemRemem={
                 Type='SWITCH'
             },
-            DanNetOn={
-                Type='SWITCH'
-            },
-            MiscGem={},
-            MiscGemLW={},
-            MiscGemRemem={},
             TwistOn={
                 Type='SWITCH'
             },
-            TwistMed={},
-            TwistWhat={},
+            TwistMed={
+                Type='STRING'
+            },
+            TwistWhat={
+                Type='STRING'
+            },
             GroupEscapeOn={
                 Type='SWITCH'
             },
@@ -50,11 +87,9 @@ local schema = {
             DPSMeter={
                 Type='SWITCH'
             },
-            CharInfo={},
             ScatterOn={
                 Type='SWITCH'
             },
-            DefaultUI={},
             CheerPeople={
                 Type='SWITCH'
             },
@@ -64,30 +99,57 @@ local schema = {
             BuffWhileChasing={
                 Type='SWITCH'
             }
+            --Role
+            --GemStuckAbility
+            --DanNetDelay
+            --HoTTOn
+            --MoveCloserIfNoLOS
+            --IRCOn
+            --CastRetries
+            --SwitchWithMA
+            --TravelOnHorse
         }
     },
     SpellSet={
         Properties={
-            LoadSpellSet={},
-            SpellSetName={}
+            LoadSpellSet={
+                Type='NUMBER',
+                Min=0,
+                Max=2
+            },
+            SpellSetName={
+                Type='STRING'
+            }
         }
     },
     Melee={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
-            AssistAt={},
+            AssistAt={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
             FaceMobOn={
                 Type='SWITCH'
             },
-            MeleeDistance={},
-            StickHow={},
+            MeleeDistance={
+                Type='NUMBER',
+                Min=0
+            },
+            StickHow={
+                Type='STRING'
+            },
             MeleeTwistOn={
                 Type='SWITCH'
             },
-            MeleeTwistWhat={},
+            MeleeTwistWhat={
+                Type='STRING'
+            },
             AutoFireOn={
                 Type='SWITCH'
             },
@@ -97,12 +159,20 @@ local schema = {
             Autohide={
                 Type='SWITCH'
             },
-            BeforeCombat={}
+            BeforeCombat={
+                Type='SPELL'
+            }
+            --DismountDuringFights
+            --TankAllMobs
         }
     },
     DPS={
         Controls={
-            On=true,
+            On={
+                Type='NUMBER',
+                Min=0,
+                Max=2
+            },
             COn=true
         },
         Properties={
@@ -111,16 +181,27 @@ local schema = {
                 Max=40,
                 Conditions=true
             },
-            DPSSkip={},
-            DPSInterval={},
+            DPSSkip={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
+            DPSInterval={
+                Type='NUMBER',
+                Min=0
+            },
             DebuffAllOn={
-                Type='SWITCH'
+                Type='NUMBER',
+                Min=0,
+                Max=2
             }
         }
     },
     Buffs={
         Controls={
-            On=true,
+            On={
+                Type='SWITCH'
+            },
             COn=true
         },
         Properties={
@@ -132,12 +213,19 @@ local schema = {
             RebuffOn={
                 Type='SWITCH'
             },
-            CheckBuffsTimer={},
-            PowerSource={},
+            CheckBuffsTimer={
+                Type='NUMBER',
+                Min=0
+            },
+            PowerSource={
+                Type='STRING'
+            },
             BegOn={
                 Type='SWITCH'
             },
-            BegPermissions={},
+            BegPermissions={
+                Type='STRING'
+            },
             Beg={
                 Type='LIST',
                 Max=20,
@@ -147,7 +235,9 @@ local schema = {
     },
     Heals={
         Controls={
-            On=true,
+            On={
+                Type='SWITCH'
+            },
             COn=true
         },
         Properties={
@@ -156,11 +246,15 @@ local schema = {
                 Max=15,
                 Conditions=true
             },
-            XTarHeal={},
+            XTarHeal={
+                Type='STRING'
+            },
             AutoRezOn={
                 Type='SWITCH'
             },
-            AutoRezWith={},
+            AutoRezWith={
+                Type='SPELL'
+            },
             HealGroupPetsOn={
                 Type='SWITCH'
             },
@@ -171,28 +265,43 @@ local schema = {
     },
     Cures={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
             Cures={
                 Type='LIST',
                 Max=5,
-                Conditions=false
+                Conditions=true
             }
         }
     },
     Mez={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Classes={brd=1,enc=1},
         Properties={
-            MezRadius={},
-            MezMinLevel={},
-            MezMaxLevel={},
-            MezStopHPs={},
+            MezRadius={
+                Type='NUMBER',
+                Min=0
+            },
+            MezMinLevel={
+                Type='NUMBER',
+                Min=1
+            },
+            MezMaxLevel={
+                Type='NUMBER',
+                Min=1
+            },
+            MezStopHPs={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
             MezSpell={
                 Type='SPELL'
             },
@@ -203,14 +312,17 @@ local schema = {
     },
     Pet={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
             PetSpell={
                 Type='SPELL'
             },
-            PetFocus={},
+            PetFocus={
+                Type='SPELL'
+            },
             PetShrinkOn={
                 Type='SWITCH'
             },
@@ -231,77 +343,128 @@ local schema = {
             PetCombatOn={
                 Type='SWITCH'
             },
-            PetAssistAt={},
-            PetBreakMezSpell={},
-            PetRampPullWait={},
+            PetAssistAt={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
+            PetBreakMezSpell={
+                Type='SPELL'
+            },
+            PetRampPullWait={
+                Type='SWITCH'
+            },
             PetSuspend={
                 Type='SWITCH'
             },
             MoveWhenHit={
                 Type='SWITCH'
-            },
-            PetForceHealOnMed={
-                Type='SWITCH'
             }
+            --PetToysSize
         }
     },
     Pull={
         Properties={
-            PullWith={},
-            MaxRadius={},
-            MaxZRange={},
-            PullWait={},
-            PullRoleToggle={},
+            PullWith={
+                Type='String'
+            },
+            MaxRadius={
+                Type='NUMBER',
+                Min=1
+            },
+            MaxZRange={
+                Type='NUMBER',
+                Min=1
+            },
+            PullWait={
+                Type='NUMBER',
+                Min=0
+            },
+            PullRoleToggle={
+                Type='SWITCH'
+            },
             PullTwistOn={
                 Type='SWITCH'
             },
             ChainPull={
                 Type='SWITCH'
             },
-            ChainPullHP={},
-            PullPause={},
-            PullLevel={},
+            ChainPullHP={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
+            PullPause={
+                Type='STRING'
+            },
+            PullLevel={
+                Type='STRING'
+            },
             PullMeleeStick={
                 Type='SWITCH'
             },
             UseWayPointZ={
                 Type='SWITCH'
             },
-            PullArcWidth={}
+            PullArcWidth={
+                Type='NUMBER',
+                Min=0,
+                Max=360
+            }
         }
     },
     Merc={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
-            MercAssistAt={},
+            MercAssistAt={
+                Type='NUMBER',
+                Min=1,
+                Max=100
+            },
             AutoRevive={
                 Type='SWITCH'
             }
         }
     },
     Burn={
+        Controls={
+            COn=true
+        },
         Properties={
             Burn={
                 Type='LIST',
                 Max=15,
-                Conditions=false
+                Conditions=true
             },
             BurnAllNamed={
-                Type='SWITCH'
-            }
+                Type='NUMBER',
+                Min=0,
+                Max=2
+            },
+            --BurnText
+            --UseTribute
         }
     },
     AFKTools={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
-            AFKGMAction={},
-            AFKPCRadius={},
+            AFKGMAction={
+                Type='NUMBER',
+                Min=0,
+                Max=4
+            },
+            AFKPCRadius={
+                Type='NUMBER',
+                Min=0
+            },
             CampOnDeath={
                 Type='SWITCH'
             },
@@ -314,21 +477,31 @@ local schema = {
         }
     },
     GoM={
+        Controls={
+            On={
+                Type='SWITCH'
+            },
+            COn=true
+        },
         Properties={
             GoM={
                 Type='LIST',
                 Max=5,
-                Conditions=false
+                Conditions=true
             }
         }
     },
     AE={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            }
         },
         Properties={
-            AERadius={},
+            AERadius={
+                Type='NUMBER',
+                Min=0
+            },
             AE={
                 Type='LIST',
                 Max=10,
@@ -338,20 +511,24 @@ local schema = {
     },
     Aggro={
         Controls={
-            On=true,
-            COn=false
+            On={
+                Type='SWITCH'
+            },
+            COn=true
         },
         Properties={
             Aggro={
                 Type='LIST',
                 Max=5,
-                Conditions=false
+                Conditions=true
             }
         }
     },
     OhShit={
         Controls={
-            On=true,
+            On={
+                Type='SWITCH'
+            },
             COn=true
         },
         Properties={
@@ -362,6 +539,8 @@ local schema = {
             }
         }
     }
+    -- Gmail
+    -- Bandolier
 }
 
 return schema
