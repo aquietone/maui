@@ -889,6 +889,10 @@ local function DrawSpells(spellSection)
         Save()
         globals.INIFileContents = utils.ReadRawINIFile()
     end
+    ImGui.SameLine()
+    if ImGui.Button('Mem Spells') then
+        mq.cmdf('/memmyspells %s', globals.INIFile)
+    end
 end
 
 -- Draw an INI section tab
