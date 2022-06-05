@@ -89,22 +89,23 @@ local InitSpellTree = function()
         end
     end
     -- Build spell tree for picking spells
-    repeat
+    for spellIter=1,960 do
         local spell = mq.TLO.Me.Book(spellIter)
-        if not spells[spell.Category()] then
-            spells[spell.Category()] = {subcategories={}}
-            table.insert(spells.categories, spell.Category())
+        if spell() then
+            if not spells[spell.Category()] then
+                spells[spell.Category()] = {subcategories={}}
+                table.insert(spells.categories, spell.Category())
+            end
+            if not spells[spell.Category()][spell.Subcategory()] then
+                spells[spell.Category()][spell.Subcategory()] = {}
+                table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
+            end
+            if spell.Level() >= myLevel-30 then
+                local name = spell.Name():gsub(' Rk%..*', '')
+                table.insert(spells[spell.Category()][spell.Subcategory()], name)
+            end
         end
-        if not spells[spell.Category()][spell.Subcategory()] then
-            spells[spell.Category()][spell.Subcategory()] = {}
-            table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
-        end
-        if spell.Level() >= myLevel-30 then
-            local name = spell.Name():gsub(' Rk%..*', '')
-            table.insert(spells[spell.Category()][spell.Subcategory()], name)
-        end
-        spellIter = spellIter + 1
-    until mq.TLO.Me.Book(spellIter)() == nil
+    end
     table.sort(spells.categories)
     for category,subcategories in pairs(spells) do
         if category ~= 'categories' then
@@ -139,10 +140,10 @@ local InitDiscTree = function()
     table.sort(discs)
 end
 
-local GetBestInSpell = function(targetType, subCat, numEffects)
+local GetSpellUpgrade = function(targetType, subCat, numEffects)
     local max = 0
     local maxName = ''
-    for i=1,900 do
+    for i=1,960 do
         local valid = true
         local spell = mq.TLO.Me.Book(i)
         if not spell.ID() then
@@ -156,6 +157,7 @@ local GetBestInSpell = function(targetType, subCat, numEffects)
         end
         if valid then
             if spell.HasSPA(470)() or spell.HasSPA(374)() or spell.HasSPA(340)() then
+                -- TODO: handle spells with trigger effect SPAs
                 --[[for eIdx=1,spell.NumEffects() do
                     for SPAIdx=1,spell.Trigger(eIdx).NumEffects() do
 
@@ -223,6 +225,7 @@ local DrawSpellPicker = function(sectionName, key, index)
                                 local spellLevel = mq.TLO.Spell(spell).Level()
                                 SetSpellTextColor(spell)
                                 if ImGui.MenuItem(spellLevel..' - '..spell..'##'..sectionName..key..subcategory) then
+                                    -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
                                     config[sectionName][key..index] = spell
                                 end
                                 ImGui.PopStyleColor()
@@ -267,6 +270,7 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
         config[sectionName][key..selected[selectedIdx]] = 'NULL'
     end
     ImGui.SetCursorPosX(175)
+    -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
     config[sectionName][key..selected[selectedIdx]] = ImGui.InputText('##'..sectionName..key..selected[selectedIdx], config[sectionName][key..selected[selectedIdx]])
     if value['Conditions'] then
         ImGui.Text('Condition: ')
@@ -277,14 +281,16 @@ local DrawSelectedListItem = function(sectionName, key, value, selectedIdx)
         ImGui.SetCursorPosX(175)
         config[sectionName][key..'Cond'..selected[selectedIdx]] = ImGui.InputText('##condition'..sectionName..key..selected[selectedIdx], config[sectionName][key..'Cond'..selected[selectedIdx]])
     end
+    -- TODO: There's probably better ways to handle finding and displaying the upgrade spell button...
     local iniValueParts = Split(config[sectionName][key..selected[selectedIdx]])
     local spell = mq.TLO.Spell(iniValueParts[1])
     if spell then
         if not selectedUpgrade[selectedIdx] then
-            selectedUpgrade[selectedIdx] = GetBestInSpell(spell.TargetType(), spell.Subcategory(), spell.NumEffects())
+            selectedUpgrade[selectedIdx] = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects())
         end
         if selectedUpgrade[selectedIdx] ~= '' and selectedUpgrade[selectedIdx] ~= spell.Name() then
             if ImGui.Button('Upgrade Available - '..selectedUpgrade[selectedIdx]) then
+                -- TODO: would be nice to not replace the full value inclduing all the |stuff after the spell name
                 config[sectionName][key..selected[selectedIdx]] = selectedUpgrade[selectedIdx]
                 selectedUpgrade[selectedIdx] = nil
             end
@@ -413,6 +419,8 @@ local DrawProperty = function(sectionName, key, value)
         config[sectionName][key] = ImGui.InputText('##'..sectionName..key, tostring(config[sectionName][key]))
         ImGui.PopItemWidth()
     elseif value['Type'] == 'MULTIPART' then
+        -- TODO: what's a nice clean way to represent values which are multiple parts? 
+        -- Currently just using this experimentally with RezAcceptOn
         local parts = Split(config[sectionName][key])
         for partIdx,part in ipairs(value['Parts']) do
             if part['Type'] == 'SWITCH' then
