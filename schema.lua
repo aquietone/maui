@@ -439,23 +439,14 @@ local schema = {
                 Min=1,
                 Max=100,
             },
+            ChainPullPause={
+                Type='STRING',
+            },
             PullPause={
                 Type='STRING',
             },
             PullLevel={
-                Type='MULTIPART',
-                Parts={
-                    [1]={
-                        Name='Min Level',
-                        Type='NUMBER',
-                        Min=1,
-                    },
-                    [2]={
-                        Name='Max Level',
-                        Type='NUMBER',
-                        Min=1,
-                    },
-                },
+                Type='STRING',
             },
             PullMeleeStick={
                 Type='SWITCH',
