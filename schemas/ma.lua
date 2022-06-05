@@ -394,7 +394,9 @@ local schema = {
                 Tooltip='0 is off. Otherwise, it will heal that slot. You should not use slot 1.',
             },
             AutoRezOn={
-                Type='SWITCH',
+                Type='NUMBER',
+                Min=0,
+                Max=2,
                 Tooltip='Turns on auto Rez feature. Will rez any character with in a radius of 100 of the Rezzer. HealsOn=1 must be on for this feature to work.',
             },
             AutoRezWith={

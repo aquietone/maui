@@ -34,7 +34,7 @@ local selectedListItem = {nil, 0} -- {key, index}
 local selectedUpgrade = nil
 local selectedSection = 'General' -- Left hand menu selected item
 
-local tloCache = cache:new(200, 300)
+local tloCache = cache:new(300, 300)
 
 globals.MyServer = mq.TLO.EverQuest.Server()
 globals.MyName = mq.TLO.Me.CleanName()
@@ -65,7 +65,7 @@ if not selected_start_command then
 end
 
 -- Storage for spell/AA/disc picker
-local spells, altAbilities, discs = {categories={}},{},{}
+local spells, altAbilities, discs = {categories={}},{types={'General','Archtype','Class','Special'}},{categories={}}
 
 local TABLE_FLAGS = bit32.bor(ImGuiTableFlags.Hideable, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.BordersOuter)
 
@@ -120,26 +120,28 @@ local SpellSorter = function(a, b)
 end
 
 local function AddSpellToMap(spell)
-    if not spells[spell.Category()] then
-        spells[spell.Category()] = {subcategories={}}
-        table.insert(spells.categories, spell.Category())
+    local cat = spell.Category()
+    local subcat = spell.Subcategory()
+    if not spells[cat] then
+        spells[cat] = {subcategories={}}
+        table.insert(spells.categories, cat)
     end
-    if not spells[spell.Category()][spell.Subcategory()] then
-        spells[spell.Category()][spell.Subcategory()] = {}
-        table.insert(spells[spell.Category()].subcategories, spell.Subcategory())
+    if not spells[cat][subcat] then
+        spells[cat][subcat] = {}
+        table.insert(spells[cat].subcategories, subcat)
     end
-    if spell.Level() >= globals.MyLevel-30 then
+    --if spell.Level() >= globals.MyLevel-30 then
         local name = spell.Name():gsub(' Rk%..*', '')
-        table.insert(spells[spell.Category()][spell.Subcategory()], {spell.Level(), name})
-    end
+        table.insert(spells[cat][subcat], {spell.Level(), name, spell.Name()})
+    --end
 end
 
-local function SortSpellMap()
+local function SortMap(map)
     -- sort categories and subcategories alphabetically, spells by level
-    table.sort(spells.categories)
-    for category,subcategories in pairs(spells) do
+    table.sort(map.categories)
+    for category,subcategories in pairs(map) do
         if category ~= 'categories' then
-            table.sort(spells[category].subcategories)
+            table.sort(map[category].subcategories)
             for subcategory,subcatspells in pairs(subcategories) do
                 if subcategory ~= 'subcategories' then
                     table.sort(subcatspells, SpellSorter)
@@ -152,36 +154,56 @@ end
 -- Ability menu initializers
 local function InitSpellTree()
     -- Build spell tree for picking spells
-    for spellIter=1,960 do
+    for spellIter=1,1120 do
         local spell = mq.TLO.Me.Book(spellIter)
         if spell() then
             AddSpellToMap(spell)
         end
     end
-    SortSpellMap()
+    SortMap(spells)
+end
+
+local function AddAAToMap(aa)
+    local type = altAbilities.types[aa.Type()]
+    if not altAbilities[type] then
+        altAbilities[type] = {}
+    end
+    table.insert(altAbilities[type], {aa.Name(),aa.Spell.Name()})
 end
 
 local function InitAATree()
     -- TODO: what's the right way to loop through activated abilities?
     for aaIter=1,10000 do
-        if mq.TLO.Me.AltAbility(aaIter)() and mq.TLO.Me.AltAbility(aaIter).Spell() then
-            table.insert(altAbilities, mq.TLO.Me.AltAbility(aaIter).Name())
+        local aa = mq.TLO.Me.AltAbility(aaIter)
+        if aa.Spell() then
+            AddAAToMap(aa)
         end
-        aaIter = aaIter + 1
     end
-    table.sort(altAbilities)
+end
+
+local function AddDiscToMap(disc)
+    local cat = disc.Category()
+    local subcat = disc.Subcategory()
+    if not discs[cat] then
+        discs[cat] = {subcategories={}}
+        table.insert(discs.categories, cat)
+    end
+    if not discs[cat][subcat] then
+        discs[cat][subcat] = {}
+        table.insert(discs[cat].subcategories, subcat)
+    end
+    local name = disc.Name():gsub(' Rk%..*', '')
+    table.insert(discs[cat][subcat], {disc.Level(), name, disc.Name()})
 end
 
 local function InitDiscTree()
-    -- Build disc tree for picking discs
-    -- TODO: split up by timers? haven't really looked at discs yet
     local discIter = 1
     repeat
-        local name = mq.TLO.Me.CombatAbility(discIter).Name():gsub(' Rk%..*', '')
-        table.insert(discs, name)
+        local disc = mq.TLO.Me.CombatAbility(discIter)
+        AddDiscToMap(disc)
         discIter = discIter + 1
     until mq.TLO.Me.CombatAbility(discIter)() == nil
-    table.sort(discs)
+    SortMap(discs)
 end
 
 --Given some spell data input, determine whether a better spell with the same inputs exists
@@ -190,7 +212,7 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
     local max2 = 0
     local maxName = ''
     local maxLevel = 0
-    for i=1,960 do
+    for i=1,1120 do
         local valid = true
         local spell = mq.TLO.Me.Book(i)
         if not spell.ID() then
@@ -308,6 +330,11 @@ local function DrawSpellPicker(sectionName, key, index)
                     if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
                         for _,subcategory in ipairs(spells[category].subcategories) do
                             -- Subcategory Spell menu
+                            local menuHeight = -1
+                            if #spells[category][subcategory] > 25 then
+                                menuHeight = ImGui.GetTextLineHeight()*25
+                            end
+                            ImGui.SetNextWindowSize(250, menuHeight)
                             if #spells[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
                                 for _,spell in ipairs(spells[category][subcategory]) do
                                     -- spell[1]=level, spell[2]=name
@@ -328,32 +355,55 @@ local function DrawSpellPicker(sectionName, key, index)
             end
         end
         -- Top level 'AAs' menu item
-        if sectionName ~= 'MySpells' and #altAbilities > 0 then
-            local menuHeight = -1
-            if #altAbilities > 25 then
-                menuHeight = ImGui.GetTextLineHeight()*25
-            end
-            ImGui.SetNextWindowSize(250, menuHeight)
-            if ImGui.BeginMenu('AAs##rcmenu'..sectionName..key) then
-                for _,altAbility in ipairs(altAbilities) do
-                    if ImGui.MenuItem(altAbility..'##aa'..sectionName..key) then
-                        valueParts[1] = altAbility
+        if sectionName ~= 'MySpells' and #altAbilities.types > 0 then
+            if ImGui.BeginMenu('Alt Abilities##rcmenu'..sectionName..key) then
+                for _,type in ipairs(altAbilities.types) do
+                    local menuHeight = -1
+                    if #altAbilities[type] > 25 then
+                        menuHeight = ImGui.GetTextLineHeight()*25
+                    end
+                    ImGui.SetNextWindowSize(250, menuHeight)
+                    if ImGui.BeginMenu(type..'##aamenu'..sectionName..key..type) then
+                        for _,altAbility in ipairs(altAbilities[type]) do
+                            SetSpellTextColor(altAbility[2])
+                            if ImGui.MenuItem(altAbility[1]..'##aa'..sectionName..key) then
+                                valueParts[1] = altAbility[1]
+                            end
+                            ImGui.PopStyleColor()
+                        end
+                        ImGui.EndMenu()
                     end
                 end
                 ImGui.EndMenu()
             end
         end
         -- Top level 'Discs' menu item
-        if sectionName ~= 'MySpells' and #discs > 0 then
-            local menuHeight = -1
-            if #discs > 25 then
-                menuHeight = ImGui.GetTextLineHeight()*25
-            end
-            ImGui.SetNextWindowSize(250, menuHeight)
+        if sectionName ~= 'MySpells' and #discs.categories > 0 then
             if ImGui.BeginMenu('Combat Abilities##rcmenu'..sectionName..key) then
-                for _,disc in ipairs(discs) do
-                    if ImGui.MenuItem(disc..'##disc'..sectionName..key) then
-                        valueParts[1] = disc
+                for _,category in ipairs(discs.categories) do
+                    -- Spell Subcategories submenu
+                    if ImGui.BeginMenu(category..'##rcmenu'..sectionName..key..category) then
+                        for _,subcategory in ipairs(discs[category].subcategories) do
+                            -- Subcategory Spell menu
+                            local menuHeight = -1
+                            if #discs[category][subcategory] > 25 then
+                                menuHeight = ImGui.GetTextLineHeight()*25
+                            end
+                            ImGui.SetNextWindowSize(250, menuHeight)
+                            if #discs[category][subcategory] > 0 and ImGui.BeginMenu(subcategory..'##'..sectionName..key..subcategory) then
+                                for _,disc in ipairs(discs[category][subcategory]) do
+                                    -- spell[1]=level, spell[2]=name
+                                    SetSpellTextColor(disc[2])
+                                    if ImGui.MenuItem(disc[1]..' - '..disc[2]..'##'..sectionName..key..subcategory) then
+                                        valueParts[1] = disc[2]
+                                        selectedUpgrade = nil
+                                    end
+                                    ImGui.PopStyleColor()
+                                end
+                                ImGui.EndMenu()
+                            end
+                        end
+                        ImGui.EndMenu()
                     end
                 end
                 ImGui.EndMenu()
@@ -1236,25 +1286,21 @@ else
     globals.Config = {}
 end
 
-local initCo = coroutine.create(function()
-    -- Initializing and sorting spell tree takes a few seconds, so run in parallel
-    InitSpellTree()
-    InitAATree()
-    InitDiscTree()
-end)
-coroutine.resume(initCo)
-
 mq.bind('/maui', BindMaui)
 
 mq.event('NewSpellMemmed', '#*#You have finished scribing #1#.', NewSpellMemmed)
 
 mq.imgui.init('MuleAssist', MAUI)
 
+local init_done = false
 while not terminate do
-    if coroutine.status(initCo) == 'suspended' then
-        coroutine.resume(initCo)
-    end
     mq.doevents()
+    if not init_done then
+        InitSpellTree()
+        InitAATree()
+        InitDiscTree()
+        init_done = true
+    end
     if memspell then
         local rankname = mq.TLO.Spell(memspell).RankName()
         mq.cmdf('/memspell %s "%s"', memgem, rankname)

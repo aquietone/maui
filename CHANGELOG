@@ -1,5 +1,6 @@
 0.9.1
 - Fix file dialog not displaying full content
+- Improve aa and disc right click menu
 0.9.0
 - Add file selection dialog for choosing INI files
 - Caching for TLO lookups to improve performance
