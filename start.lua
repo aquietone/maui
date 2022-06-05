@@ -202,6 +202,9 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
         end
         if valid then
             -- TODO: several trigger spells i don't think this would handle properly...
+            -- 470 == trigger best in spell group
+            -- 374 == trigger spell
+            -- 340 == chance spell
             if spell.HasSPA(470)() or spell.HasSPA(374)() or spell.HasSPA(340)() then
                 for eIdx=1,spell.NumEffects() do
                     if spell.Trigger(eIdx)() then
@@ -276,6 +279,8 @@ local function SetSpellTextColor(spell)
     end
 end
 
+local memspell = nil
+local memgem = 0
 -- Recreate the spell bar context menu
 -- sectionName+key+index defines where to store the result
 -- selectedIdx is used to clear spell upgrade input incase of updating over an existing entry
@@ -348,6 +353,17 @@ local function DrawSpellPicker(sectionName, key, index)
                     end
                 end
                 ImGui.EndMenu()
+            end
+        end
+        if valueParts[1] and mq.TLO.Me.Book(mq.TLO.Spell(valueParts[1]).RankName())() then
+            if ImGui.MenuItem('Memorize Spell') then
+                for i=1,13 do
+                    if not mq.TLO.Me.Gem(i)() then
+                        memspell = valueParts[1]
+                        memgem = i
+                        break
+                    end
+                end
             end
         end
         ImGui.EndPopup()
@@ -1168,5 +1184,13 @@ while not terminate do
         coroutine.resume(initCo)
     end
     mq.doevents()
+    if memspell then
+        local rankname = mq.TLO.Spell(memspell).RankName()
+        mq.cmdf('/memspell %s "%s"', memgem, rankname)
+        mq.delay('3s', function() return mq.TLO.Me.Gem(memgem)() and mq.TLO.Me.Gem(memgem).Name() == rankname end)
+        mq.TLO.Window('SpellBookWnd').DoClose()
+        memspell = nil
+        memgem = 0
+    end
     mq.delay(20)
 end
