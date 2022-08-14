@@ -1,3 +1,5 @@
+0.9.8
+- Add use of PackageMan to download lfs.dll
 0.9.7
 - Error handling broken/missing section header in INI file load
 0.9.6
