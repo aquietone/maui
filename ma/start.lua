@@ -2,6 +2,29 @@
 local mq = require('mq')
 --- @type ImGui
 require('ImGui')
+
+-- LFS must be downloaded from the luarocks server before anything can work
+-- so do that first. This will open a dialog prompting to download lfs.dll
+-- if not already present.
+-- Include helper function so we can give user friendly messages
+function Include(...)
+    local status, lib = pcall(require, ...)
+    if(status) then
+        return lib
+    end
+    return nil
+end
+local lfs = Include('lfs')
+if not lfs then
+    local PackageMan = Include('mq.PackageMan')
+    lfs = PackageMan.InstallAndLoad('luafilesystem', 'lfs')
+end
+
+if not lfs then
+    print('\arError loading LuaFileSystem dependency, ending script\ax')
+    mq.exit()
+end
+
 local LIP = require('ma.lib.LIP')
 local globals = require('ma.globals')
 local utils = require('ma.utils')
