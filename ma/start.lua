@@ -897,6 +897,9 @@ local function DrawSpellsGemList(spellSection)
             ImGui.SameLine()
         end
     end
+    -- in case a spell gem was left clicked, don't mark it as selected so we don't enter the selected item drill-down
+    selectedListItem = {nil, 0}
+    selectedUpgrade = nil
 end
 
 local function DrawSpells(spellSection)
