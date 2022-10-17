@@ -190,6 +190,10 @@ local schema = {
                 Type='NUMBER',
                 Tooltip='',
             },
+            TravelOnHorse={
+                Type='SWITCH',
+                Tooltip=''
+            }
             --Role string (Assist)
             --GemStuckAbility string (NULL)
             --HoTTOn int (0)
