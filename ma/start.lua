@@ -284,7 +284,7 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
                     end
                 end
                 -- TODO: this won't handle spells whos trigger SPA is just the illusion portion
-            elseif spell.SPA() then
+            else
                 for SPAIdx=1,spell.NumEffects() do
                     --print(string.format('[%s] .Base: %d, Base2: %d, Max: %d', spell.Name(), spell.Base(SPAIdx)(), spell.Base2(SPAIdx)(), spell.Max(SPAIdx)()))
                     if spell.Base(SPAIdx)() < -1 then
