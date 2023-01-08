@@ -92,7 +92,7 @@ utils.HelpMarker = function(desc)
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
         ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
-        ImGui.Text(desc)
+        ImGui.Text('%s', desc)
         ImGui.PopTextWrapPos()
         ImGui.EndTooltip()
     end

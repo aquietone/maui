@@ -1,7 +1,7 @@
 local schemas = {'ma'}--, 'ka',}
 
 local globals = {
-    Version = '0.9.10',
+    Version = '0.9.11',
     INIFile = nil, -- file name of character INI to load
     INIFileContents = nil, -- raw file contents for raw INI tab
     INILoadError = '', -- store error message for INI load failures
