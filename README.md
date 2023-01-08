@@ -4,7 +4,7 @@ UI for MuleAssist macro written in Lua using Imgui.
 
 ## Installation
 
-Copy `maui.lua` and the `ma` folder into the MQ `lua` folder.
+Copy the `maui` folder into the MQ `lua` folder.
 
 ## Usage
 
