@@ -1,3 +1,5 @@
+0.11.0
+- Update to use CursorAttachment for dragging in spell gems.. thought i pushed this already..
 0.10.0
 - Rename folder to maui and use init.lua
 0.9.11

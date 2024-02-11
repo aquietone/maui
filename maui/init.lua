@@ -1,6 +1,4 @@
---- @type Mq
 local mq = require('mq')
---- @type ImGui
 require('ImGui')
 
 -- LFS must be downloaded from the luarocks server before anything can work
@@ -562,15 +560,19 @@ local function DrawPlainListButton(sectionName, key, listIdx, iconSize)
     -- INI value is set to non-spell/item
     if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
         if type(listIdx) == 'number' then
-            if mq.TLO.Cursor() then
-                globals.Config[sectionName][key..listIdx] = mq.TLO.Cursor.Name()
+            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
+                globals.Config[sectionName][key..listIdx] = mq.TLO.CursorAttachment.Item.Name()
+            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
+                globals.Config[sectionName][key..listIdx] = mq.TLO.CursorAttachment.Spell.Name()
             else
                 selectedListItem = {key, listIdx}
                 selectedUpgrade = nil
             end
         else
-            if mq.TLO.Cursor() then
-                globals.Config[sectionName][key] = mq.TLO.Cursor.Name()
+            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
+                globals.Config[sectionName][key] = mq.TLO.CursorAttachment.Item.Name()
+            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
+                globals.Config[sectionName][key] = mq.TLO.CursorAttachment.Spell.Name()
             end
         end
     elseif type(listIdx) == 'number' then
@@ -684,8 +686,10 @@ local function DrawSpellIconOrButton(sectionName, key, index)
             end
             ImGui.EndDragDropTarget()
         elseif ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
-            if mq.TLO.Cursor() then
-                globals.Config[sectionName][key..index] = mq.TLO.Cursor.Name()
+            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
+                globals.Config[sectionName][key..index] = mq.TLO.CursorAttachment.Item.Name()
+            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
+                globals.Config[sectionName][key..index] = mq.TLO.CursorAttachment.Spell.Name()
             else
                 selectedListItem = {key, index}
                 selectedUpgrade = nil
@@ -995,7 +999,7 @@ end
 
 local function LeftPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
-    if ImGui.BeginChild("left", leftPanelWidth, y-1, true) then
+    if ImGui.BeginChild("left", leftPanelWidth, y-1, ImGuiChildFlags.Border) then
         if ImGui.BeginTable('SelectSectionTable', 1, TABLE_FLAGS, 0, 0, 0.0) then
             ImGui.TableSetupColumn('Section Name',     0,   -1.0, 1)
             ImGui.TableSetupScrollFreeze(0, 1) -- Make row always visible
@@ -1039,7 +1043,7 @@ end
 
 local function RightPaneWindow()
     local x,y = ImGui.GetContentRegionAvail()
-    if ImGui.BeginChild("right", x, y-1, true) then
+    if ImGui.BeginChild("right", x, y-1, ImGuiChildFlags.Border) then
         if customSections[selectedSection] then
             customSections[selectedSection]()
         else
@@ -1227,8 +1231,8 @@ local ICON_WIDTH = 40
 local ICON_HEIGHT = 40
 -- If there is an item on the cursor, display it.
 local function display_item_on_cursor()
-    if mq.TLO.Cursor() then
-        local cursor_item = mq.TLO.Cursor -- this will be an MQ item, so don't forget to use () on the members!
+    if mq.TLO.CursorAttachment.Type() == 'ITEM' then
+        local cursor_item = mq.TLO.CursorAttachment.Item
         local mouse_x, mouse_y = ImGui.GetMousePos()
         local window_x, window_y = ImGui.GetWindowPos()
         local icon_x = mouse_x - window_x + 10
@@ -1236,6 +1240,15 @@ local function display_item_on_cursor()
         ImGui.SetCursorPos(icon_x, icon_y)
         animItems:SetTextureCell(cursor_item.Icon() - EQ_ICON_OFFSET)
         ImGui.DrawTextureAnimation(animItems, ICON_WIDTH, ICON_HEIGHT)
+    elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
+        local cursor_spell = mq.TLO.CursorAttachment.Spell
+        local mouse_x, mouse_y = ImGui.GetMousePos()
+        local window_x, window_y = ImGui.GetWindowPos()
+        local icon_x = mouse_x - window_x + 10
+        local icon_y = mouse_y - window_y + 10
+        ImGui.SetCursorPos(icon_x, icon_y)
+        animSpellIcons:SetTextureCell(cursor_spell.SpellIcon())
+        ImGui.DrawTextureAnimation(animSpellIcons, ICON_WIDTH, ICON_HEIGHT)
     end
 end
 
