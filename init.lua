@@ -1225,33 +1225,6 @@ local function DrawWindowHeaderSettings()
     ImGui.Separator()
 end
 
--- Thanks coldblooded!
-local EQ_ICON_OFFSET = 500
-local ICON_WIDTH = 40
-local ICON_HEIGHT = 40
--- If there is an item on the cursor, display it.
-local function display_item_on_cursor()
-    if mq.TLO.CursorAttachment.Type() == 'ITEM' then
-        local cursor_item = mq.TLO.CursorAttachment.Item
-        local mouse_x, mouse_y = ImGui.GetMousePos()
-        local window_x, window_y = ImGui.GetWindowPos()
-        local icon_x = mouse_x - window_x + 10
-        local icon_y = mouse_y - window_y + 10
-        ImGui.SetCursorPos(icon_x, icon_y)
-        animItems:SetTextureCell(cursor_item.Icon() - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animItems, ICON_WIDTH, ICON_HEIGHT)
-    elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
-        local cursor_spell = mq.TLO.CursorAttachment.Spell
-        local mouse_x, mouse_y = ImGui.GetMousePos()
-        local window_x, window_y = ImGui.GetWindowPos()
-        local icon_x = mouse_x - window_x + 10
-        local icon_y = mouse_y - window_y + 10
-        ImGui.SetCursorPos(icon_x, icon_y)
-        animSpellIcons:SetTextureCell(cursor_spell.SpellIcon())
-        ImGui.DrawTextureAnimation(animSpellIcons, ICON_WIDTH, ICON_HEIGHT)
-    end
-end
-
 local function push_styles()
     ImGui.PushStyleColor(ImGuiCol.WindowBg, 0, 0, 0, .9)
     ImGui.PushStyleColor(ImGuiCol.TitleBg, .3, 0, 0, 1)
@@ -1292,7 +1265,6 @@ local MAUI = function()
         end
         DrawWindowHeaderSettings()
         DrawWindowPanels()
-        display_item_on_cursor()
     end
     ImGui.End()
     if used_theme then pop_styles() end
